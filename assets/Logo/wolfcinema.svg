@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+  <!-- خلفية سوداء بمقاس مربع 1:1 -->
+  <rect width="500" height="500" fill="#0a0a0a"/>
+  
+  <g transform="translate(250, 240) scale(1.35)">
+    <!-- الجانب الأيسر (أسود / رمادي داكن) -->
+    <polygon points="0,-110 -65,-125 -38,-25" fill="#1c1c1c"/>
+    <polygon points="-65,-125 -85,-15 -38,-25" fill="#2b2b2b"/>
+    <polygon points="-85,-15 -100,18 -45,32" fill="#161616"/>
+    <polygon points="-100,18 -60,58 -45,32" fill="#242424"/>
+    <polygon points="-45,32 -60,58 0,90" fill="#0f0f0f"/>
+    <polygon points="-45,32 0,90 0,15" fill="#1f1f1f"/>
+    <polygon points="0,-110 -38,-25 0,15" fill="#282828"/>
+    
+    <!-- الجانب الأيمن (أحمر ناري) -->
+    <polygon points="0,-110 65,-125 38,-25" fill="#cc0000"/>
+    <polygon points="65,-125 85,-15 38,-25" fill="#ff1a1a"/>
+    <polygon points="85,-15 100,18 45,32" fill="#b30000"/>
+    <polygon points="100,18 60,58 45,32" fill="#e60000"/>
+    <polygon points="45,32 60,58 0,90" fill="#990000"/>
+    <polygon points="45,32 0,90 0,15" fill="#d60000"/>
+    <polygon points="0,-110 38,-25 0,15" fill="#ff2a2a"/>
+    
+    <!-- التفاصيل الفضية (الأذن والعيون) -->
+    <polygon points="-52,-95 -40,-45 -28,-60" fill="#d1d5db"/>
+    <polygon points="52,-95 40,-45 28,-60" fill="#e5e7eb"/>
+    <polygon points="-48,-5 -22,-12 -12,8 -35,12" fill="#e5e7eb"/>
+    <polygon points="48,-5 22,-12 12,8 35,12" fill="#ffffff"/>
+  </g>
+</svg>

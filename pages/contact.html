@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>اتصل بنا | WOLFCINEMA</title>
+    <link rel="icon" type="image/png" href="../assets/logo/wolfcinema.svg">
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+    <header class="navbar">
+        <a href="../index.html" class="logo">
+            <img src="../assets/logo/wolfcinema.png" alt="WOLFCINEMA">
+        </a>
+        <nav class="nav-links">
+            <a href="../index.html">الرئيسية</a>
+            <a href="../index.html#movies">أفلام</a>
+            <a href="../index.html#series">مسلسلات</a>
+            <a href="../index.html#anime">أنمي</a>
+        </nav>
+    </header>
+
+    <main class="static-page">
+
+        <div class="static-hero">
+            <h1>اتصل بنا</h1>
+            <p>يسعدنا تواصلك معنا في أي وقت</p>
+        </div>
+
+        <div class="static-content">
+
+            <section class="static-section">
+                <h2>📬 معلومات التواصل</h2>
+                <div class="contact-info-grid">
+
+                    <div class="contact-info-card">
+                        <div class="contact-icon">📧</div>
+                        <h3>البريد الإلكتروني</h3>
+                        <a href="mailto:support@wolfcinema.com">support@wolfcinema.com</a>
+                    </div>
+
+                    <div class="contact-info-card">
+                        <div class="contact-icon">💬</div>
+                        <h3>الدعم الفني</h3>
+                        <a href="mailto:help@wolfcinema.com">help@wolfcinema.com</a>
+                    </div>
+
+                    <div class="contact-info-card">
+                        <div class="contact-icon">⚖️</div>
+                        <h3>حقوق النشر</h3>
+                        <a href="mailto:dmca@wolfcinema.com">dmca@wolfcinema.com</a>
+                    </div>
+
+                </div>
+            </section>
+
+            <section class="static-section">
+                <h2>✉️ أرسل لنا رسالة</h2>
+                <p>سيتم الرد عليك في أقرب وقت ممكن (خلال 24-48 ساعة)</p>
+
+                <form class="contact-form" id="contactForm">
+
+                    <div class="form-row">
+                        <div class="static-form-group">
+                            <label>الاسم *</label>
+                            <input type="text" name="name" required placeholder="اكتب اسمك">
+                        </div>
+
+                        <div class="static-form-group">
+                            <label>البريد الإلكتروني *</label>
+                            <input type="email" name="email" required placeholder="example@mail.com">
+                        </div>
+                    </div>
+
+                    <div class="static-form-group">
+                        <label>الموضوع *</label>
+                        <select name="subject" required>
+                            <option value="">— اختر —</option>
+                            <option value="استفسار عام">استفسار عام</option>
+                            <option value="مشكلة تقنية">مشكلة تقنية</option>
+                            <option value="اقتراح">اقتراح</option>
+                            <option value="حقوق نشر">حقوق نشر</option>
+                            <option value="أخرى">أخرى</option>
+                        </select>
+                    </div>
+
+                    <div class="static-form-group">
+                        <label>الرسالة *</label>
+                        <textarea name="message" rows="6" required placeholder="اكتب رسالتك هنا..."></textarea>
+                    </div>
+
+                    <button type="submit" class="static-submit-btn">
+                        📤 إرسال الرسالة
+                    </button>
+
+                </form>
+            </section>
+
+        </div>
+
+    </main>
+
+    <footer class="footer">
+        <h2>WOLFCINEMA</h2>
+        <p>وجهتك لمشاهدة أحدث الأفلام والمسلسلات والأنمي</p>
+        <div class="footer-links">
+            <a href="about.html">من نحن</a>
+            <a href="contact.html">اتصل بنا</a>
+            <a href="privacy.html">سياسة الخصوصية</a>
+            <a href="terms.html">شروط الاستخدام</a>
+            <a href="dmca.html">DMCA</a>
+        </div>
+    </footer>
+<script>
+document.getElementById("contactForm").addEventListener("submit", async function(e) {
+
+    e.preventDefault();
+
+    const form = this;
+    const btn = form.querySelector(".static-submit-btn");
+    const formData = new FormData(form);
+
+    const data = {
+        name:    formData.get("name"),
+        email:   formData.get("email"),
+        subject: formData.get("subject"),
+        message: formData.get("message")
+    };
+
+    /* تعطيل الزر */
+    btn.disabled = true;
+    btn.textContent = "⏳ جاري الإرسال...";
+
+    try {
+        const res = await fetch("http://localhost:3000/api/messages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        });
+
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || "فشل الإرسال");
+
+        showToast("✅ تم إرسال رسالتك بنجاح! سيتم الرد عليك قريبًا");
+        form.reset();
+
+    } catch (err) {
+        showToast("❌ " + err.message, "error");
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "📤 إرسال الرسالة";
+    }
+});
+
+/* ===== Toast بسيط ===== */
+function showToast(msg, type = "success") {
+    const toast = document.createElement("div");
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: ${type === "error" ? "linear-gradient(135deg, #e50914, #b20710)" : "linear-gradient(135deg, #16a34a, #15803d)"};
+        color: #fff;
+        padding: 16px 28px;
+        border-radius: 12px;
+        font-weight: 800;
+        font-size: 14px;
+        z-index: 9999;
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
+        transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        max-width: 90%;
+        text-align: center;
+        font-family: inherit;
+    `;
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.transform = "translateX(-50%) translateY(0)";
+    }, 50);
+
+    setTimeout(() => {
+        toast.style.transform = "translateX(-50%) translateY(100px)";
+        setTimeout(() => toast.remove(), 400);
+    }, 4000);
+}
+</script>
+    <script>
+        document.getElementById("contactForm").addEventListener("submit", function(e) {
+            e.preventDefault();
+            alert("✅ تم إرسال رسالتك بنجاح!\n\nسيتم الرد عليك خلال 24-48 ساعة.");
+            this.reset();
+        });
+    </script>
+
+</body>
+</html>

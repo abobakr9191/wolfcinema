@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة التحكم | WOLFCINEMA</title>
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <span class="red">WOLF</span>CINEMA
+            <small>Admin Panel</small>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-tab="dashboard">📊 الرئيسية</a>
+            <a href="#" class="nav-item" data-tab="add">➕ إضافة عمل</a>
+            <a href="#" class="nav-item" data-tab="list">📋 قائمة الأعمال</a>
+            <a href="#" class="nav-item" data-tab="messages">
+                📬 الرسائل
+                <span class="messages-badge" id="messagesBadge" style="display:none;">0</span>
+            </a>
+            <a href="http://localhost:5500/index.html" target="_blank" class="nav-item">🌐 عرض الموقع</a>
+        </nav>
+    </aside>
+
+    <!-- ================= MAIN ================= -->
+    <main class="main">
+
+        <!-- ============ DASHBOARD ============ -->
+        <section class="tab-content active" id="tab-dashboard">
+
+            <h1 class="page-title">📊 نظرة عامة</h1>
+
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card">
+                    <div class="stat-icon">🎬</div>
+                    <div class="stat-value" id="statTotal">0</div>
+                    <div class="stat-label">إجمالي الأعمال</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🎥</div>
+                    <div class="stat-value" id="statMovies">0</div>
+                    <div class="stat-label">أفلام</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📺</div>
+                    <div class="stat-value" id="statSeries">0</div>
+                    <div class="stat-label">مسلسلات</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🎌</div>
+                    <div class="stat-value" id="statAnime">0</div>
+                    <div class="stat-label">أنمي</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🎞️</div>
+                    <div class="stat-value" id="statEpisodes">0</div>
+                    <div class="stat-label">حلقات</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⭐</div>
+                    <div class="stat-value" id="statFeatured">0</div>
+                    <div class="stat-label">أعمال مميزة</div>
+                </div>
+            </div>
+
+            <h2 class="section-title">⚡ إجراءات سريعة</h2>
+            <div class="quick-actions">
+                <button class="quick-btn" data-goto="add">➕ إضافة عمل جديد</button>
+                <button class="quick-btn" data-goto="list">📋 عرض كل الأعمال</button>
+                <button class="quick-btn" data-goto="messages">📬 عرض الرسائل</button>
+            </div>
+
+        </section>
+
+        <!-- ============ إضافة عمل ============ -->
+        <section class="tab-content" id="tab-add">
+            <h1 class="page-title">➕ إضافة عمل جديد</h1>
+
+            <form id="addForm" class="work-form">
+
+                <div class="form-section">
+                    <h3 class="form-section-title">📌 المعلومات الأساسية</h3>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>اسم العمل *</label>
+                            <input type="text" name="title" required placeholder="مثال: One Punch Man">
+                        </div>
+                        <div class="form-group">
+                            <label>النوع *</label>
+                            <select name="type" required>
+                                <option value="">— اختر —</option>
+                                <option value="فيلم">🎥 فيلم</option>
+                                <option value="مسلسل">📺 مسلسل</option>
+                                <option value="أنمي">🎌 أنمي</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>السنة</label>
+                            <input type="text" name="year" placeholder="2024">
+                        </div>
+                        <div class="form-group">
+                            <label>التقييم (من 10)</label>
+                            <input type="text" name="rating" placeholder="8.5">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>بلد الإنتاج</label>
+                            <input type="text" name="country" placeholder="مصر / أمريكا / اليابان">
+                        </div>
+                        <div class="form-group">
+                            <label>اللغة</label>
+                            <input type="text" name="language" placeholder="العربية / الإنجليزية">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>الحالة</label>
+                            <select name="status">
+                                <option value="">— اختر —</option>
+                                <option value="مكتمل">مكتمل</option>
+                                <option value="مستمر">مستمر</option>
+                                <option value="قادم">قادم</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>مميز في الرئيسية؟</label>
+                            <select name="featured">
+                                <option value="false">لا</option>
+                                <option value="true">نعم — يظهر في المقدمة</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>هل هذا موسم من عمل آخر؟</label>
+                            <select name="parent_id" id="addParentSelect">
+                                <option value="">— لا، عمل مستقل —</option>
+                            </select>
+                            <small style="color:#888;font-size:11px;display:block;margin-top:6px;">
+                                اختر العمل الأصلي لو ده موسم منه
+                            </small>
+                        </div>
+                        <div class="form-group">
+                            <label>رقم الموسم</label>
+                            <input type="number" name="season_number" min="1" placeholder="اتركه فاضي لو مش موسم">
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="form-section">
+                    <h3 class="form-section-title">📝 الوصف</h3>
+
+                    <div class="form-group">
+                        <textarea name="description" rows="5" placeholder="اكتب وصف العمل..."></textarea>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3 class="form-section-title">🏷️ التصنيفات (اختر ما ينطبق)</h3>
+
+                    <div class="genre-search-box">
+                        <input type="text" id="genreSearchInput" placeholder="🔍 ابحث في التصنيفات...">
+                    </div>
+
+                    <div id="genreSelector"></div>
+
+                    <div class="selected-genres">
+                        <span class="selected-label">التصنيفات المختارة:</span>
+                        <div class="selected-genres-list" id="selectedGenresList">
+                            <span class="no-genres">لم تختر أي تصنيف</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3 class="form-section-title">📁 الملفات</h3>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>صورة العمل (البوستر)</label>
+                            <input type="file" name="poster" accept="image/*" id="posterInput">
+                            <div class="preview" id="posterPreview"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>الفيديو (لو فيلم بس)</label>
+                            <input type="file" name="video" accept="video/*" id="videoInput">
+                            <div class="file-name" id="videoName"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="submit-btn">💾 حفظ العمل</button>
+            </form>
+        </section>
+
+        <!-- ============ قائمة الأعمال ============ -->
+        <section class="tab-content" id="tab-list">
+            <h1 class="page-title">📋 قائمة الأعمال</h1>
+
+            <div class="list-controls">
+                <input type="text" id="worksSearch" placeholder="🔍 ابحث بالاسم...">
+                <select id="worksFilter">
+                    <option value="">كل الأنواع</option>
+                    <option value="فيلم">أفلام</option>
+                    <option value="مسلسل">مسلسلات</option>
+                    <option value="أنمي">أنمي</option>
+                </select>
+            </div>
+
+            <div class="works-grid" id="worksGrid"></div>
+        </section>
+
+        <!-- ============ الرسائل ============ -->
+        <section class="tab-content" id="tab-messages">
+
+            <h1 class="page-title">📬 الرسائل الواردة</h1>
+
+            <div class="messages-toolbar">
+                <div class="messages-stats">
+                    <span class="msg-stat">
+                        📨 <strong id="msgTotal">0</strong> رسالة
+                    </span>
+                    <span class="msg-stat unread">
+                        🔵 <strong id="msgUnread">0</strong> غير مقروءة
+                    </span>
+                </div>
+                <button class="refresh-messages-btn" id="refreshMessagesBtn">
+                    🔄 تحديث
+                </button>
+            </div>
+
+            <div class="messages-grid" id="messagesGrid"></div>
+
+        </section>
+
+        <!-- ============ إدارة حلقات عمل ============ -->
+        <section class="tab-content" id="tab-episodes">
+
+            <button class="back-btn" id="backToList">← رجوع للقائمة</button>
+
+            <h1 class="page-title" id="episodesPageTitle">📺 إدارة الحلقات</h1>
+
+            <div class="episode-form-box">
+                <h2 class="section-title-small">➕ إضافة حلقة جديدة</h2>
+
+                <form id="episodeForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>الموسم *</label>
+                            <input type="number" name="season" required min="1" value="1" placeholder="1">
+                        </div>
+                        <div class="form-group">
+                            <label>رقم الحلقة *</label>
+                            <input type="number" name="number" required min="1" placeholder="1">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>عنوان الحلقة (اختياري)</label>
+                        <input type="text" name="title" placeholder="مثال: البداية">
+                    </div>
+
+                    <div class="form-group">
+                        <label>فيديو الحلقة *</label>
+                        <input type="file" name="episode_video" accept="video/*" required id="episodeVideoInput">
+                        <div class="file-name" id="episodeVideoName"></div>
+                    </div>
+
+                    <button type="submit" class="submit-btn">💾 حفظ الحلقة</button>
+                </form>
+            </div>
+
+            <h2 class="section-title-small" style="margin-top:40px;">📋 الحلقات المضافة</h2>
+            <div class="episodes-admin-grid" id="episodesAdminGrid"></div>
+
+        </section>
+
+    </main>
+
+    <!-- =====================================================
+         EDIT MODAL
+    ===================================================== -->
+    <div class="edit-modal-overlay" id="editModalOverlay">
+
+        <div class="edit-modal">
+
+            <button class="edit-modal-close" id="editModalClose">✕</button>
+
+            <h2 class="edit-modal-title">✏️ تعديل العمل</h2>
+
+            <form id="editForm" class="edit-form">
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>اسم العمل *</label>
+                        <input type="text" name="title" id="editTitle" required>
+                    </div>
+                    <div class="form-group">
+                        <label>النوع *</label>
+                        <select name="type" id="editType" required>
+                            <option value="فيلم">🎥 فيلم</option>
+                            <option value="مسلسل">📺 مسلسل</option>
+                            <option value="أنمي">🎌 أنمي</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>السنة</label>
+                        <input type="text" name="year" id="editYear">
+                    </div>
+                    <div class="form-group">
+                        <label>التقييم</label>
+                        <input type="text" name="rating" id="editRating">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>بلد الإنتاج</label>
+                        <input type="text" name="country" id="editCountry">
+                    </div>
+                    <div class="form-group">
+                        <label>اللغة</label>
+                        <input type="text" name="language" id="editLanguage">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>الحالة</label>
+                        <select name="status" id="editStatus">
+                            <option value="">— اختر —</option>
+                            <option value="مكتمل">مكتمل</option>
+                            <option value="مستمر">مستمر</option>
+                            <option value="قادم">قادم</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>مميز في الرئيسية؟</label>
+                        <select name="featured" id="editFeatured">
+                            <option value="false">لا</option>
+                            <option value="true">نعم</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>هل هذا موسم من عمل آخر؟</label>
+                        <select name="parent_id" id="editParentSelect">
+                            <option value="">— لا، عمل مستقل —</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>رقم الموسم</label>
+                        <input type="number" name="season_number" id="editSeasonNumber" min="1" placeholder="اتركه فاضي لو مش موسم">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>الوصف</label>
+                    <textarea name="description" id="editDescription" rows="5"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>التصنيفات (مفصولة بـ •)</label>
+                    <input type="text" name="genre" id="editGenre" placeholder="أكشن • مغامرة">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>تغيير الصورة (اختياري)</label>
+                        <input type="file" name="poster" accept="image/*" id="editPosterInput">
+                        <div class="preview" id="editPosterPreview"></div>
+                        <div class="current-media" id="editCurrentPoster"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>تغيير الفيديو (اختياري)</label>
+                        <input type="file" name="video" accept="video/*" id="editVideoInput">
+                        <div class="file-name" id="editVideoName"></div>
+                        <div class="current-media" id="editCurrentVideo"></div>
+                    </div>
+                </div>
+
+                <div class="edit-actions">
+                    <button type="submit" class="submit-btn" id="editSubmitBtn">💾 حفظ التعديلات</button>
+                    <button type="button" class="cancel-btn" id="editCancelBtn">إلغاء</button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="admin.js"></script>
+</body>
+</html>
