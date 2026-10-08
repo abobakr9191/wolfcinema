@@ -4,8 +4,8 @@
 
 "use strict";
 
-const API_URL    = "http://localhost:3000/api";
-const SERVER_URL = "http://localhost:3000";
+const API_URL    = "https://backend-bitter-sunbeam-7292.fly.dev";
+const SERVER_URL = "https://backend-bitter-sunbeam-7292.fly.dev";
 
 /* =====================================================
    البيانات المحلية

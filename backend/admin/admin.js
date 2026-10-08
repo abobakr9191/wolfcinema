@@ -3,6 +3,7 @@
 ===================================================== */
 
 const API = "http://localhost:3000/api";
+const SERVER_URL = "http://localhost:3000";
 
 let currentWorkId = null;
 let selectedGenres = [];
@@ -190,6 +191,7 @@ document.querySelectorAll(".nav-item[data-tab]").forEach(link => {
         showTab(link.dataset.tab);
         if (link.dataset.tab === "list") loadWorks();
         if (link.dataset.tab === "dashboard") loadStats();
+        if (link.dataset.tab === "messages") loadMessages();
     });
 });
 
@@ -198,6 +200,7 @@ document.querySelectorAll(".quick-btn").forEach(btn => {
         const target = btn.dataset.goto;
         showTab(target);
         if (target === "list") loadWorks();
+        if (target === "messages") loadMessages();
     });
 });
 
@@ -260,7 +263,6 @@ document.getElementById("addForm").addEventListener("submit", async (e) => {
     const btn = form.querySelector(".submit-btn");
     const formData = new FormData(form);
 
-    /* دمج التصنيفات المختارة */
     const genreString = selectedGenres.join(" • ");
     formData.set("genre", genreString);
 
@@ -286,7 +288,6 @@ document.getElementById("addForm").addEventListener("submit", async (e) => {
         document.getElementById("videoName").textContent = "";
         document.getElementById("genreSearchInput").value = "";
 
-        /* إعادة تحميل قائمة الآباء */
         loadParentsOptions();
 
     } catch (err) {
@@ -370,7 +371,7 @@ function renderWorks(works) {
         const isSeason = w.parent_id !== null && w.parent_id !== undefined;
 
         const posterSrc = w.poster
-            ? (w.poster.startsWith("http") ? w.poster : "http://localhost:3000/" + w.poster)
+            ? (w.poster.startsWith("http") ? w.poster : SERVER_URL + "/" + w.poster)
             : "https://via.placeholder.com/300x450/12121a/e50914?text=No+Poster";
 
         return `
@@ -597,10 +598,8 @@ async function openEditModal(workId) {
 
         editingWorkId = workId;
 
-        /* ===== تحميل قائمة الآباء أولاً ===== */
         await loadParentsOptions();
 
-        /* ===== تعبئة الحقول العادية ===== */
         document.getElementById("editTitle").value       = work.title || "";
         document.getElementById("editType").value        = work.type || "فيلم";
         document.getElementById("editYear").value        = work.year || "";
@@ -612,19 +611,17 @@ async function openEditModal(workId) {
         document.getElementById("editDescription").value = work.description || "";
         document.getElementById("editGenre").value       = work.genre || "";
 
-        /* ===== تعبئة حقول الموسم ===== */
         const editParent = document.getElementById("editParentSelect");
         const editSeason = document.getElementById("editSeasonNumber");
 
         if (editParent) editParent.value = work.parent_id || "";
         if (editSeason) editSeason.value = work.season_number || "";
 
-        /* ===== الصورة الحالية ===== */
         const posterBox = document.getElementById("editCurrentPoster");
         if (work.poster) {
             const src = work.poster.startsWith("http")
                 ? work.poster
-                : `http://localhost:3000/${work.poster}`;
+                : `${SERVER_URL}/${work.poster}`;
 
             posterBox.innerHTML = `
                 <p style="color:#888;font-size:12px;margin:8px 0 6px;">الصورة الحالية:</p>
@@ -634,7 +631,6 @@ async function openEditModal(workId) {
             posterBox.innerHTML = `<p style="color:#666;font-size:12px;">لا توجد صورة</p>`;
         }
 
-        /* ===== الفيديو الحالي ===== */
         const videoBox = document.getElementById("editCurrentVideo");
         if (work.video) {
             videoBox.innerHTML = `
@@ -644,13 +640,11 @@ async function openEditModal(workId) {
             videoBox.innerHTML = `<p style="color:#666;font-size:12px;">لا يوجد فيديو</p>`;
         }
 
-        /* ===== إعادة تعيين ===== */
         document.getElementById("editPosterInput").value = "";
         document.getElementById("editVideoInput").value = "";
         document.getElementById("editPosterPreview").innerHTML = "";
         document.getElementById("editVideoName").textContent = "";
 
-        /* ===== فتح المودال ===== */
         document.getElementById("editModalOverlay").classList.add("active");
         document.body.style.overflow = "hidden";
 
@@ -738,14 +732,6 @@ document.getElementById("editForm").addEventListener("submit", async (e) => {
 });
 
 /* =====================================================
-   INIT
-===================================================== */
-
-buildGenreSelector();
-renderSelectedGenres();
-loadStats();
-loadParentsOptions();
-/* =====================================================
    MESSAGES SYSTEM
 ===================================================== */
 
@@ -763,17 +749,14 @@ async function loadMessages() {
 
         const messages = await res.json();
 
-        /* الإحصائيات */
         const total = messages.length;
         const unread = messages.filter(m => m.is_read === 0).length;
 
         document.getElementById("msgTotal").textContent = total;
         document.getElementById("msgUnread").textContent = unread;
 
-        /* البادج في الـ Sidebar */
         updateMessagesBadge(unread);
 
-        /* لو فاضية */
         if (!messages.length) {
             grid.innerHTML = `
                 <div class="messages-empty">
@@ -785,218 +768,6 @@ async function loadMessages() {
             return;
         }
 
-        /* عرض الرسائل */
-        grid.innerHTML = messages.map(msg => {
-
-            const isUnread = msg.is_read === 0;
-
-            const date = new Date(msg.created_at);
-            const formatted = formatMessageDate(date);
-
-            const initial = (msg.name || "?").trim().charAt(0).toUpperCase();
-
-            return `
-                <div class="message-card ${isUnread ? "unread" : ""}" data-id="${msg.id}">
-
-                    <div class="message-header">
-
-                        <div class="message-sender">
-
-                            <div class="message-avatar">${initial}</div>
-
-                            <div class="message-sender-info">
-                                <h4>${escapeHtml(msg.name)}</h4>
-                                <a href="mailto:${escapeHtml(msg.email)}">${escapeHtml(msg.email)}</a>
-                            </div>
-
-                        </div>
-
-                        <div class="message-meta">
-                            ${msg.subject ? `<span class="message-subject">${escapeHtml(msg.subject)}</span>` : ""}
-                            <span class="message-date">🕐 ${formatted}</span>
-                        </div>
-
-                    </div>
-
-                    <div class="message-body">${escapeHtml(msg.message)}</div>
-
-                    <div class="message-actions">
-
-                        <a href="mailto:${escapeHtml(msg.email)}?subject=رد على: ${escapeHtml(msg.subject || "رسالتك")}"
-                           class="msg-btn msg-btn-reply">
-                            📧 رد
-                        </a>
-
-                        ${isUnread ? `
-                            <button class="msg-btn msg-btn-read" data-action="read" data-id="${msg.id}">
-                                ✓ تعليم كمقروءة
-                            </button>
-                        ` : ""}
-
-                        <button class="msg-btn msg-btn-delete" data-action="delete" data-id="${msg.id}">
-                            🗑 حذف
-                        </button>
-
-                    </div>
-
-                </div>
-            `;
-        }).join("");
-
-        /* ربط الأزرار */
-        grid.querySelectorAll("[data-action='read']").forEach(btn => {
-            btn.addEventListener("click", () => markMessageRead(btn.dataset.id));
-        });
-
-        grid.querySelectorAll("[data-action='delete']").forEach(btn => {
-            btn.addEventListener("click", () => deleteMessage(btn.dataset.id));
-        });
-
-    } catch (err) {
-        grid.innerHTML = "<div class='empty'>❌ تعذّر تحميل الرسائل</div>";
-        console.error(err);
-    }
-}
-
-/* ===== تعليم كمقروءة ===== */
-async function markMessageRead(id) {
-
-    try {
-        await fetch(`${API}/messages/${id}/read`, { method: "PUT" });
-        toast("✓ تم تعليم الرسالة كمقروءة", "success");
-        loadMessages();
-    } catch (err) {
-        toast("❌ فشل التحديث", "error");
-    }
-}
-
-/* ===== حذف رسالة ===== */
-async function deleteMessage(id) {
-
-    if (!confirm("هل أنت متأكد من حذف الرسالة؟")) return;
-
-    try {
-        await fetch(`${API}/messages/${id}`, { method: "DELETE" });
-        toast("🗑 تم حذف الرسالة", "success");
-        loadMessages();
-    } catch (err) {
-        toast("❌ فشل الحذف", "error");
-    }
-}
-
-/* ===== تحديث البادج ===== */
-async function updateMessagesBadge(count) {
-
-    const badge = document.getElementById("messagesBadge");
-    if (!badge) return;
-
-    if (count === undefined) {
-        /* جلب العدد من السيرفر */
-        try {
-            const res = await fetch(`${API}/messages/unread/count`);
-            const data = await res.json();
-            count = data.count;
-        } catch (err) {
-            return;
-        }
-    }
-
-    if (count > 0) {
-        badge.textContent = count;
-        badge.style.display = "inline-block";
-    } else {
-        badge.style.display = "none";
-    }
-}
-
-/* ===== تنسيق التاريخ ===== */
-function formatMessageDate(date) {
-
-    const now = new Date();
-    const diff = Math.floor((now - date) / 1000); /* بالثواني */
-
-    if (diff < 60) return "منذ لحظات";
-    if (diff < 3600) return `منذ ${Math.floor(diff / 60)} دقيقة`;
-    if (diff < 86400) return `منذ ${Math.floor(diff / 3600)} ساعة`;
-    if (diff < 604800) return `منذ ${Math.floor(diff / 86400)} يوم`;
-
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = date.getFullYear();
-
-    return `${day}/${month}/${year}`;
-}
-
-/* ===== حماية النص ===== */
-function escapeHtml(str) {
-    return String(str || "").replace(/[&<>"']/g, c => ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;"
-    }[c]));
-}
-
-/* ===== ربط تاب الرسائل ===== */
-document.querySelectorAll(".nav-item[data-tab='messages']").forEach(link => {
-    link.addEventListener("click", () => {
-        loadMessages();
-    });
-});
-
-/* ===== زر التحديث ===== */
-const refreshBtn = document.getElementById("refreshMessagesBtn");
-if (refreshBtn) {
-    refreshBtn.addEventListener("click", loadMessages);
-}
-
-/* ===== تحديث البادج كل 30 ثانية ===== */
-setInterval(() => updateMessagesBadge(), 30000);
-
-/* ===== تحديث البادج عند بدء التشغيل ===== */
-updateMessagesBadge();
-/* =====================================================
-   MESSAGES SYSTEM
-===================================================== */
-
-async function loadMessages() {
-
-    const grid = document.getElementById("messagesGrid");
-    if (!grid) return;
-
-    grid.innerHTML = "<div class='empty'>⏳ جاري التحميل...</div>";
-
-    try {
-
-        const res = await fetch(`${API}/messages`);
-        if (!res.ok) throw new Error("فشل التحميل");
-
-        const messages = await res.json();
-
-        /* الإحصائيات */
-        const total = messages.length;
-        const unread = messages.filter(m => m.is_read === 0).length;
-
-        document.getElementById("msgTotal").textContent = total;
-        document.getElementById("msgUnread").textContent = unread;
-
-        /* البادج في الـ Sidebar */
-        updateMessagesBadge(unread);
-
-        /* لو فاضية */
-        if (!messages.length) {
-            grid.innerHTML = `
-                <div class="messages-empty">
-                    <span class="emoji">📭</span>
-                    <h3>لا توجد رسائل بعد</h3>
-                    <p>ستظهر الرسائل هنا عند إرسالها من صفحة "اتصل بنا"</p>
-                </div>
-            `;
-            return;
-        }
-
-        /* عرض الرسائل */
         grid.innerHTML = messages.map(msg => {
 
             const isUnread = msg.is_read === 0;
@@ -1052,7 +823,6 @@ async function loadMessages() {
             `;
         }).join("");
 
-        /* ربط الأزرار */
         grid.querySelectorAll("[data-action='read']").forEach(btn => {
             btn.addEventListener("click", () => markMessageRead(btn.dataset.id));
         });
@@ -1067,7 +837,6 @@ async function loadMessages() {
     }
 }
 
-/* ===== تعليم كمقروءة ===== */
 async function markMessageRead(id) {
 
     try {
@@ -1079,7 +848,6 @@ async function markMessageRead(id) {
     }
 }
 
-/* ===== حذف رسالة ===== */
 async function deleteMessage(id) {
 
     if (!confirm("هل أنت متأكد من حذف الرسالة؟")) return;
@@ -1093,7 +861,6 @@ async function deleteMessage(id) {
     }
 }
 
-/* ===== تحديث البادج ===== */
 async function updateMessagesBadge(count) {
 
     const badge = document.getElementById("messagesBadge");
@@ -1117,7 +884,6 @@ async function updateMessagesBadge(count) {
     }
 }
 
-/* ===== تنسيق التاريخ ===== */
 function formatMessageDate(date) {
 
     const now = new Date();
@@ -1135,7 +901,6 @@ function formatMessageDate(date) {
     return `${day}/${month}/${year}`;
 }
 
-/* ===== حماية النص ===== */
 function escapeHtml(str) {
     return String(str || "").replace(/[&<>"']/g, c => ({
         "&": "&amp;",
@@ -1146,13 +911,6 @@ function escapeHtml(str) {
     }[c]));
 }
 
-/* ===== ربط تاب الرسائل ===== */
-document.querySelectorAll(".nav-item[data-tab='messages']").forEach(link => {
-    link.addEventListener("click", () => {
-        loadMessages();
-    });
-});
-
 /* ===== زر التحديث ===== */
 const refreshMessagesBtn = document.getElementById("refreshMessagesBtn");
 if (refreshMessagesBtn) {
@@ -1162,5 +920,12 @@ if (refreshMessagesBtn) {
 /* ===== تحديث البادج كل 30 ثانية ===== */
 setInterval(() => updateMessagesBadge(), 30000);
 
-/* ===== تحديث البادج عند بدء التشغيل ===== */
+/* =====================================================
+   INIT
+===================================================== */
+
+buildGenreSelector();
+renderSelectedGenres();
+loadStats();
+loadParentsOptions();
 updateMessagesBadge();

@@ -10,7 +10,15 @@ const multer  = require("multer");
 const sqlite3 = require("sqlite3").verbose();
 
 const app  = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
+
+/* ===== مجلد البيانات (Persistent Disk) ===== */
+const DATA_DIR = process.env.DATA_DIR || __dirname;
+
+/* لو المجلد مش موجود، اعمله */
+if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+}
 
 /* ===== Middleware ===== */
 app.use(cors());
@@ -18,7 +26,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 /* ===== المجلدات ===== */
-const UPLOADS_DIR   = path.join(__dirname, "uploads");
+const UPLOADS_DIR   = path.join(DATA_DIR, "uploads");
 const POSTERS_DIR   = path.join(UPLOADS_DIR, "posters");
 const VIDEOS_DIR    = path.join(UPLOADS_DIR, "videos");
 
@@ -26,9 +34,39 @@ const VIDEOS_DIR    = path.join(UPLOADS_DIR, "videos");
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
+/* =====================================================
+   حماية لوحة التحكم بكلمة سر (Basic Auth)
+===================================================== */
+
+const ADMIN_USER = process.env.ADMIN_USER || "wolfadmin";
+const ADMIN_PASS = process.env.ADMIN_PASS || "W@#$19869191";
+
+function adminAuth(req, res, next) {
+
+    const auth = req.headers.authorization;
+
+    /* لو مفيش Authorization header */
+    if (!auth || !auth.startsWith("Basic ")) {
+        res.set("WWW-Authenticate", 'Basic realm="WOLFCINEMA Admin"');
+        return res.status(401).send("🔒 يتطلب تسجيل دخول");
+    }
+
+    try {
+        const decoded = Buffer.from(auth.split(" ")[1], "base64").toString("utf8");
+        const [user, pass] = decoded.split(":");
+
+        if (user === ADMIN_USER && pass === ADMIN_PASS) {
+            return next();
+        }
+    } catch (e) {}
+
+    res.set("WWW-Authenticate", 'Basic realm="WOLFCINEMA Admin"');
+    res.status(401).send("🔒 بيانات غير صحيحة");
+}
+
 /* ===== الملفات الثابتة ===== */
 app.use("/uploads", express.static(UPLOADS_DIR));
-app.use("/admin",   express.static(path.join(__dirname, "admin")));
+app.use("/admin",   adminAuth, express.static(path.join(__dirname, "admin")));
 app.use("/assets",  express.static(path.join(__dirname, "..", "assets")));
 
 /* =====================================================
@@ -36,7 +74,7 @@ app.use("/assets",  express.static(path.join(__dirname, "..", "assets")));
 ===================================================== */
 
 const db = new sqlite3.Database(
-    path.join(__dirname, "database.db"),
+    path.join(DATA_DIR, "database.db"),
     (err) => {
         if (err) console.error("DB Error:", err);
         else console.log("✅ قاعدة البيانات متصلة");
@@ -405,12 +443,12 @@ app.put(
                     : null;
 
                 if (newPoster && oldWork.poster) {
-                    const full = path.join(__dirname, oldWork.poster);
+                    const full = path.join(DATA_DIR, oldWork.poster);
                     if (fs.existsSync(full)) fs.unlinkSync(full);
                 }
 
                 if (newVideo && oldWork.video) {
-                    const full = path.join(__dirname, oldWork.video);
+                    const full = path.join(DATA_DIR, oldWork.video);
                     if (fs.existsSync(full)) fs.unlinkSync(full);
                 }
 
@@ -468,7 +506,7 @@ app.delete("/api/works/:id", (req, res) => {
         if (row) {
             [row.poster, row.video].forEach(p => {
                 if (p) {
-                    const full = path.join(__dirname, p);
+                    const full = path.join(DATA_DIR, p);
                     if (fs.existsSync(full)) fs.unlinkSync(full);
                 }
             });
@@ -540,7 +578,7 @@ app.delete("/api/episodes/:id", (req, res) => {
         if (row) {
             [row.video, row.poster].forEach(p => {
                 if (p) {
-                    const full = path.join(__dirname, p);
+                    const full = path.join(DATA_DIR, p);
                     if (fs.existsSync(full)) fs.unlinkSync(full);
                 }
             });
@@ -690,6 +728,7 @@ app.listen(PORT, () => {
     console.log("=====================================");
     console.log("🎬 WOLFCINEMA Backend شغال");
     console.log(`🌐 API: http://localhost:${PORT}`);
-    console.log(`🔧 لوحة التحكم: http://localhost:${PORT}/admin`);
+    console.log(`🔒 الداشبورد محمي بكلمة سر`);
+    console.log(`📁 مجلد البيانات: ${DATA_DIR}`);
     console.log("=====================================");
 });

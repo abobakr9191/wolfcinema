@@ -141,8 +141,8 @@ function initializeHomePage() {
    BACKEND INTEGRATION (additive)
 ===================================================== */
 
-const API_URL    = "http://localhost:3000/api";
-const SERVER_URL = "http://localhost:3000";
+const API_URL    = "https://backend-bitter-sunbeam-7292.fly.dev";
+const SERVER_URL = "https://backend-bitter-sunbeam-7292.fly.dev";
 
 async function loadFromBackend() {
 
@@ -316,7 +316,7 @@ document.addEventListener(
         if (item.poster) {
             return item.poster.startsWith("http")
                 ? item.poster
-                : `http://localhost:3000/${item.poster}`;
+                : `https://backend-bitter-sunbeam-7292.fly.dev/${item.poster}`;
         }
         return "assets/images/placeholder.jpg";
     }
@@ -640,7 +640,7 @@ document.addEventListener(
         if (item.poster) {
             return item.poster.startsWith("http")
                 ? item.poster
-                : `http://localhost:3000/${item.poster}`;
+                : `https://backend-bitter-sunbeam-7292.fly.dev/${item.poster}`;
         }
         return "assets/images/placeholder.jpg";
     }

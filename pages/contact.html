@@ -133,7 +133,7 @@ document.getElementById("contactForm").addEventListener("submit", async function
     btn.textContent = "⏳ جاري الإرسال...";
 
     try {
-        const res = await fetch("http://localhost:3000/api/messages", {
+        const res = await fetch("https://backend-bitter-sunbeam-7292.fly.dev/api/messages", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(data)
