@@ -1,11 +1,15 @@
 /* =====================================================
-   WOLFCINEMA — WATCH JAVASCRIPT (Cinema Player + Seasons)
+   WOLFCINEMA — WATCH JAVASCRIPT (Fixed + Timeline Auto-Hide)
+   - Dynamic API URL (works on Vercel & localhost)
+   - Timeline auto-hide on mouse leave
+   - Better error logging
 ===================================================== */
 
 "use strict";
 
-const API_URL     = "http://localhost:3000/api";
-const SERVER_URL  = "http://localhost:3000";
+/* ===== Dynamic API URL ===== */
+const API_URL     = window.location.origin + "/api";
+const SERVER_URL  = window.location.origin;
 const HISTORY_KEY = "wolfcinema_watch_history";
 
 /* =====================================================
@@ -79,21 +83,36 @@ function formatTime(seconds) {
 }
 
 /* =====================================================
-   Backend Helper
+   Backend Helper (with diagnostics)
 ===================================================== */
 
 async function fetchWorkFromBackend(workId) {
+    const url = `${API_URL}/works/${workId}`;
+
+    console.log("🔍 Fetching from:", url);
+
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-        const res = await fetch(`${API_URL}/works/${workId}`, { signal: controller.signal });
+        const res = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
 
-        if (!res.ok) return null;
-        return await res.json();
+        console.log("📡 Response status:", res.status);
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            console.error("❌ Server error:", res.status, errorText);
+            return null;
+        }
+
+        const data = await res.json();
+        console.log("✅ Data received:", data);
+        return data;
+
     } catch (err) {
-        console.log("ℹ️ السيرفر مش متاح");
+        console.error("💥 Fetch failed:", err.message);
+        console.error("🌐 API_URL was:", API_URL);
         return null;
     }
 }
@@ -104,7 +123,8 @@ async function fetchWorkFromBackend(workId) {
 
 document.addEventListener("DOMContentLoaded", async () => {
 
-    console.log("WOLFCINEMA WATCH: START");
+    console.log("🎬 WOLFCINEMA WATCH: START");
+    console.log("🌐 API URL:", API_URL);
 
     const urlParams = new URLSearchParams(window.location.search);
     const workId     = urlParams.get("id");
@@ -151,19 +171,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (episodeNum && apiWork.episodes && apiWork.episodes.length > 0) {
 
             const episode = apiWork.episodes.find(e => {
-
                 const sameEp = String(e.number) === String(episodeNum);
                 if (!sameEp) return false;
-
                 if (seasonNum) {
                     return String(e.season || 1) === String(seasonNum);
                 }
-
                 return true;
             });
 
             if (episode && episode.video) {
-
                 videoPath = episode.video.startsWith("http")
                     ? episode.video
                     : `${SERVER_URL}/${episode.video}`;
@@ -175,7 +191,6 @@ document.addEventListener("DOMContentLoaded", async () => {
                 work.title = `${apiWork.title}${seasonText} — حلقة ${episode.number}`;
                 work.episodeTitle = episode.title || "";
                 currentSeason = episode.season || 1;
-
             } else {
                 videoPath = null;
             }
@@ -193,6 +208,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         videoContainer.innerHTML = `
             <div class="video-error">
                 <h2>عذراً، هذا العمل غير موجود</h2>
+                <p style="color:#888;margin:10px 0;">تأكد من أن السيرفر يعمل وأن العمل موجود في قاعدة البيانات.</p>
                 <a href="../index.html" class="btn btn-back">← الرئيسية</a>
             </div>`;
         return;
@@ -203,14 +219,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.title = `مشاهدة ${work.title} | WOLFCINEMA`;
 
     if (watchMeta) {
-
         let episodeTag = "";
-
         if (episodeNum) {
-            const seasonText = (currentSeason > 1)
-                ? `م${currentSeason} • `
-                : "";
-
+            const seasonText = (currentSeason > 1) ? `م${currentSeason} • ` : "";
             episodeTag = `<span class="meta-tag">📺 ${seasonText}حلقة ${episodeNum}</span>`;
         }
 
@@ -438,6 +449,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         let controlsTimer = null;
         let speedIndicatorTimer = null;
         let volumeIndicatorTimer = null;
+        let timelineHideTimer = null;
         let isSeeking = false;
 
         function fmt(sec) {
@@ -451,7 +463,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         function showIndicator(el, text) {
-
             el.querySelector("span").textContent = text;
             el.classList.add("show");
 
@@ -539,36 +550,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             document.addEventListener("mousemove", onMove);
             document.addEventListener("mouseup", onUp);
         });
-/* =====================================================
-   إخفاء التايم لاين عند خروج الماوس منه
-===================================================== */
 
-let timelineHideTimer = null;
-
-progressWrap.addEventListener("mouseenter", () => {
-    clearTimeout(timelineHideTimer);
-    progressWrap.classList.remove("timeline-hidden");
-});
-
-progressWrap.addEventListener("mouseleave", () => {
-    clearTimeout(timelineHideTimer);
-    timelineHideTimer = setTimeout(() => {
-        if (!video.paused) {
-            progressWrap.classList.add("timeline-hidden");
-        }
-    }, 400);
-});
-
-/* إظهاره تاني لما الماوس يتحرك على المشغل */
-player.addEventListener("mousemove", () => {
-    clearTimeout(timelineHideTimer);
-    progressWrap.classList.remove("timeline-hidden");
-});
-
-/* خليه ظاهر دايماً لما الفيديو يكون واقف */
-video.addEventListener("pause", () => {
-    progressWrap.classList.remove("timeline-hidden");
-});
         progressWrap.addEventListener("mousemove", (e) => {
             const rect = progressWrap.getBoundingClientRect();
             let x = e.clientX - rect.left;
@@ -584,6 +566,35 @@ video.addEventListener("pause", () => {
             tooltip.classList.remove("show");
         });
 
+        /* =====================================================
+           إخفاء التايم لاين عند خروج الماوس منه
+        ===================================================== */
+
+        progressWrap.addEventListener("mouseenter", () => {
+            clearTimeout(timelineHideTimer);
+            progressWrap.classList.remove("timeline-hidden");
+        });
+
+        progressWrap.addEventListener("mouseleave", () => {
+            clearTimeout(timelineHideTimer);
+            timelineHideTimer = setTimeout(() => {
+                if (!video.paused) {
+                    progressWrap.classList.add("timeline-hidden");
+                }
+            }, 400);
+        });
+
+        /* إظهاره تاني لما الماوس يتحرك على المشغل */
+        player.addEventListener("mousemove", () => {
+            clearTimeout(timelineHideTimer);
+            progressWrap.classList.remove("timeline-hidden");
+        });
+
+        /* خليه ظاهر دايماً لما الفيديو يكون واقف */
+        video.addEventListener("pause", () => {
+            progressWrap.classList.remove("timeline-hidden");
+        });
+
         prevBtn.addEventListener("click", () => {
             video.currentTime = Math.max(0, video.currentTime - 10);
             showIndicator(speedIndicator, "◀◀ 10 ثوان");
@@ -595,7 +606,6 @@ video.addEventListener("pause", () => {
         });
 
         function updateVolumeUI() {
-
             const v = video.muted ? 0 : video.volume;
             const percentVal = Math.round(v * 100);
 
@@ -621,12 +631,9 @@ video.addEventListener("pause", () => {
         let isVolumeSeeking = false;
 
         function seekVolume(e) {
-
             const rect = volumeVertical.getBoundingClientRect();
-
             let y = rect.bottom - e.clientY;
             y = Math.max(0, Math.min(y, rect.height));
-
             const v = y / rect.height;
 
             video.volume = v;
@@ -661,12 +668,10 @@ video.addEventListener("pause", () => {
 
         muteBtn.addEventListener("wheel", (e) => {
             e.preventDefault();
-
             const delta = e.deltaY > 0 ? -0.05 : 0.05;
             video.volume = Math.max(0, Math.min(1, video.volume + delta));
             video.muted = video.volume === 0;
             updateVolumeUI();
-
             showIndicator(volumeIndicator, "🔊 " + Math.round(video.volume * 100) + "%");
         });
 
@@ -682,11 +687,9 @@ video.addEventListener("pause", () => {
                 const speed = parseFloat(btn.dataset.speed);
                 video.playbackRate = speed;
                 speedLabel.textContent = speed + "×";
-
                 speedMenu.querySelectorAll("button").forEach(b => b.classList.remove("active"));
                 btn.classList.add("active");
                 speedMenu.classList.remove("active");
-
                 showIndicator(speedIndicator, "⚡ " + speed + "×");
             });
         });
@@ -730,7 +733,6 @@ video.addEventListener("pause", () => {
         video.addEventListener("playing", () => loader.classList.remove("active"));
 
         document.addEventListener("keydown", (e) => {
-
             if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
 
             switch (e.key) {
@@ -841,7 +843,6 @@ video.addEventListener("pause", () => {
         let lastSave = 0;
 
         function saveProgress(force = false) {
-
             const now = Date.now();
             if (!force && now - lastSave < 5000) return;
             lastSave = now;
@@ -893,7 +894,6 @@ video.addEventListener("pause", () => {
         let nextEpisodeData = null;
 
         if (episodeNum && apiWork && apiWork.episodes && apiWork.episodes.length > 0) {
-
             const sortedEps = [...apiWork.episodes].sort((a, b) => {
                 const sa = a.season || 1;
                 const sb = b.season || 1;
@@ -902,14 +902,9 @@ video.addEventListener("pause", () => {
             });
 
             const currentIdx = sortedEps.findIndex(e => {
-
                 const sameEp = String(e.number) === String(episodeNum);
                 if (!sameEp) return false;
-
-                if (seasonNum) {
-                    return String(e.season || 1) === String(seasonNum);
-                }
-
+                if (seasonNum) return String(e.season || 1) === String(seasonNum);
                 return true;
             });
 
@@ -919,43 +914,33 @@ video.addEventListener("pause", () => {
         }
 
         if (nextEpisodeData) {
-
             let countdownTimer = null;
             let countdownValue = 10;
-
             const nextSeason = nextEpisodeData.season || 1;
 
             const nextOverlay = document.createElement("div");
             nextOverlay.className = "next-episode-overlay";
             nextOverlay.id = "nextEpisodeOverlay";
 
-            const seasonText = nextSeason > 1
-                ? `م${nextSeason} • `
-                : "";
+            const seasonText = nextSeason > 1 ? `م${nextSeason} • ` : "";
 
             nextOverlay.innerHTML = `
                 <div class="next-episode-card">
-
                     <div class="next-episode-badge">⏭️ الحلقة التالية</div>
-
                     <div class="next-episode-content">
-
                         <div class="next-episode-thumb">
                             <img src="${posterPath}" alt="الحلقة التالية">
                             <div class="next-episode-thumb-overlay">
                                 <span class="next-episode-play">▶</span>
                             </div>
                         </div>
-
                         <div class="next-episode-info">
                             <h3>${seasonText}حلقة ${nextEpisodeData.number}</h3>
                             <p class="next-episode-title-text">
                                 ${nextEpisodeData.title || "بدون عنوان"}
                             </p>
                         </div>
-
                     </div>
-
                     <div class="next-episode-countdown">
                         <span>تبدأ خلال</span>
                         <strong id="nextCountdownNum">10</strong>
@@ -968,7 +953,6 @@ video.addEventListener("pause", () => {
                             </svg>
                         </div>
                     </div>
-
                     <div class="next-episode-actions">
                         <button class="next-btn next-btn-primary" id="nextWatchBtn">
                             ▶ شغّل الآن
@@ -977,7 +961,6 @@ video.addEventListener("pause", () => {
                             ✕ إلغاء
                         </button>
                     </div>
-
                 </div>
             `;
 
@@ -985,25 +968,16 @@ video.addEventListener("pause", () => {
 
             function goToNextEpisode() {
                 clearInterval(countdownTimer);
-
                 let url = `watch.html?id=${workId}`;
-
-                if (nextSeason > 1) {
-                    url += `&season=${nextSeason}`;
-                }
-
+                if (nextSeason > 1) url += `&season=${nextSeason}`;
                 url += `&ep=${nextEpisodeData.number}`;
-
                 window.location.href = url;
             }
 
             function startCountdown() {
-
                 countdownValue = 10;
-
                 const numEl = document.getElementById("nextCountdownNum");
                 const progressEl = document.getElementById("nextCountdownProgress");
-
                 if (numEl) numEl.textContent = countdownValue;
 
                 const circumference = 163.36;
@@ -1013,20 +987,16 @@ video.addEventListener("pause", () => {
                 }
 
                 countdownTimer = setInterval(() => {
-
                     countdownValue--;
                     if (numEl) numEl.textContent = countdownValue;
-
                     if (progressEl) {
                         const offset = ((10 - countdownValue) / 10) * circumference;
                         progressEl.style.strokeDashoffset = offset;
                     }
-
                     if (countdownValue <= 0) {
                         clearInterval(countdownTimer);
                         goToNextEpisode();
                     }
-
                 }, 1000);
             }
 
@@ -1057,11 +1027,8 @@ video.addEventListener("pause", () => {
     /* ===== معلومات تحت الفيديو ===== */
     if (watchInfo) {
         let episodeTitleHTML = "";
-
         if (episodeNum && work.episodeTitle) {
-            const seasonText = (currentSeason > 1)
-                ? `م${currentSeason} • `
-                : "";
+            const seasonText = (currentSeason > 1) ? `م${currentSeason} • ` : "";
             episodeTitleHTML = `<p style="color:#e50914;font-weight:700;margin-bottom:10px;">${seasonText}حلقة ${episodeNum}: ${work.episodeTitle}</p>`;
         }
 
@@ -1079,5 +1046,5 @@ video.addEventListener("pause", () => {
             </div>`;
     }
 
-    console.log("WOLFCINEMA WATCH: Loaded", work.title);
+    console.log("✅ WOLFCINEMA WATCH: Loaded", work.title);
 });
