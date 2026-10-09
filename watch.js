@@ -7,11 +7,9 @@
 
 "use strict";
 
-/* ===== Dynamic API URL ===== */
-const API_URL     = "https://wolfcinema.vercel.app/api";
-const SERVER_URL  = "https://wolfcinema.vercel.app";
+const API_URL     = "http://localhost:3000/api";
+const SERVER_URL  = "http://localhost:3000";
 const HISTORY_KEY = "wolfcinema_watch_history";
-
 /* =====================================================
    سجل المشاهدة
 ===================================================== */
