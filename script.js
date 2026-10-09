@@ -142,8 +142,7 @@ function initializeHomePage() {
 ===================================================== */
 
 const API_URL = window.location.origin + "/api";
-const SERVER_URL = "http://localhost:3000";
-
+const SERVER_URL = window.location.origin;
 async function loadFromBackend() {
 
     try {

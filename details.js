@@ -4,8 +4,8 @@
 
 "use strict";
 
-const API_URL = "http://localhost:3000/api";
-const SERVER_URL = "http://localhost:3000"; 
+const API_URL = window.location.origin + "/api";
+const SERVER_URL = window.location.origin;
 
 /* =====================================================
    البيانات المحلية
