@@ -14,6 +14,10 @@
       "use": "@vercel/static"
     },
     {
+      "src": "assets/**",
+      "use": "@vercel/static"
+    },
+    {
       "src": "**/*.html",
       "use": "@vercel/static"
     },
@@ -26,17 +30,10 @@
       "use": "@vercel/static"
     }
   ],
-  "redirects": [
-    { "source": "/admin", "destination": "/admin/", "permanent": false }
-  ],
   "routes": [
     {
       "src": "/api/(.*)",
       "dest": "backend/server.js"
-    },
-    {
-      "src": "/admin/",
-      "dest": "/backend/admin/index.html"
     },
     {
       "src": "/admin/(.*)",
@@ -47,8 +44,15 @@
       "dest": "/backend/uploads/$1"
     },
     {
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
+    },
+    {
       "src": "/(.*)",
       "dest": "/$1"
     }
+  ],
+  "redirects": [
+    { "source": "/admin", "destination": "/admin/", "permanent": false }
   ]
 }
