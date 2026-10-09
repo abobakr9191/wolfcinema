@@ -4,8 +4,8 @@
 
 "use strict";
 
-const API_URL     = "https://backend-bitter-sunbeam-7292.fly.dev";
-const SERVER_URL  = "https://backend-bitter-sunbeam-7292.fly.dev";
+const API_URL     = "http://localhost:3000/api";
+const SERVER_URL  = "http://localhost:3000";
 const HISTORY_KEY = "wolfcinema_watch_history";
 
 /* =====================================================
@@ -150,7 +150,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         /* ===== لو حلقة محددة ===== */
         if (episodeNum && apiWork.episodes && apiWork.episodes.length > 0) {
 
-            /* نبحث بحسب الموسم كمان لو محدد */
             const episode = apiWork.episodes.find(e => {
 
                 const sameEp = String(e.number) === String(episodeNum);
@@ -866,7 +865,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         if (episodeNum && apiWork && apiWork.episodes && apiWork.episodes.length > 0) {
 
-            /* ترتيب حسب الموسم ثم الحلقة */
             const sortedEps = [...apiWork.episodes].sort((a, b) => {
                 const sa = a.season || 1;
                 const sb = b.season || 1;
@@ -874,7 +872,6 @@ document.addEventListener("DOMContentLoaded", async () => {
                 return a.number - b.number;
             });
 
-            /* موضع الحلقة الحالية */
             const currentIdx = sortedEps.findIndex(e => {
 
                 const sameEp = String(e.number) === String(episodeNum);
@@ -887,7 +884,6 @@ document.addEventListener("DOMContentLoaded", async () => {
                 return true;
             });
 
-            /* الحلقة التالية */
             if (currentIdx !== -1 && currentIdx < sortedEps.length - 1) {
                 nextEpisodeData = sortedEps[currentIdx + 1];
             }
@@ -904,7 +900,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             nextOverlay.className = "next-episode-overlay";
             nextOverlay.id = "nextEpisodeOverlay";
 
-            /* نص الموسم */
             const seasonText = nextSeason > 1
                 ? `م${nextSeason} • `
                 : "";
@@ -959,13 +954,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             player.appendChild(nextOverlay);
 
-            /* ===== الانتقال للحلقة التالية ===== */
             function goToNextEpisode() {
                 clearInterval(countdownTimer);
 
                 let url = `watch.html?id=${workId}`;
 
-                /* نضيف الموسم لو أكبر من 1 */
                 if (nextSeason > 1) {
                     url += `&season=${nextSeason}`;
                 }
@@ -975,7 +968,6 @@ document.addEventListener("DOMContentLoaded", async () => {
                 window.location.href = url;
             }
 
-            /* ===== بدء العد التنازلي ===== */
             function startCountdown() {
 
                 countdownValue = 10;
@@ -1009,23 +1001,19 @@ document.addEventListener("DOMContentLoaded", async () => {
                 }, 1000);
             }
 
-            /* ===== إلغاء العد التنازلي ===== */
             function cancelCountdown() {
                 clearInterval(countdownTimer);
                 nextOverlay.classList.remove("active");
             }
 
-            /* ===== عند نهاية الفيديو ===== */
             video.addEventListener("ended", () => {
                 nextOverlay.classList.add("active");
                 startCountdown();
             });
 
-            /* ===== الأزرار ===== */
             document.getElementById("nextWatchBtn").addEventListener("click", goToNextEpisode);
             document.getElementById("nextCancelBtn").addEventListener("click", cancelCountdown);
 
-            /* ===== لو رجع يشغل الفيديو من جديد، نلغي العد ===== */
             video.addEventListener("play", () => {
                 if (nextOverlay.classList.contains("active")) {
                     cancelCountdown();

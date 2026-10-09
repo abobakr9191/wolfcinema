@@ -1,5 +1,5 @@
 /* =====================================================
-   WOLFCINEMA — BACKEND SERVER
+   WOLFCINEMA — BACKEND SERVER (Turso Edition)
 ===================================================== */
 
 const express = require("express");
@@ -7,15 +7,14 @@ const cors    = require("cors");
 const path    = require("path");
 const fs      = require("fs");
 const multer  = require("multer");
-const sqlite3 = require("sqlite3").verbose();
+const { createClient } = require("@libsql/client");
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-/* ===== مجلد البيانات (Persistent Disk) ===== */
+/* ===== مجلد البيانات (للصور والفيديوهات فقط) ===== */
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 
-/* لو المجلد مش موجود، اعمله */
 if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
 }
@@ -39,13 +38,12 @@ const VIDEOS_DIR    = path.join(UPLOADS_DIR, "videos");
 ===================================================== */
 
 const ADMIN_USER = process.env.ADMIN_USER || "wolfadmin";
-const ADMIN_PASS = process.env.ADMIN_PASS || "W@#$19869191";
+const ADMIN_PASS = process.env.ADMIN_PASS || "W0lfCin3ma!2026";
 
 function adminAuth(req, res, next) {
 
     const auth = req.headers.authorization;
 
-    /* لو مفيش Authorization header */
     if (!auth || !auth.startsWith("Basic ")) {
         res.set("WWW-Authenticate", 'Basic realm="WOLFCINEMA Admin"');
         return res.status(401).send("🔒 يتطلب تسجيل دخول");
@@ -70,119 +68,99 @@ app.use("/admin",   adminAuth, express.static(path.join(__dirname, "admin")));
 app.use("/assets",  express.static(path.join(__dirname, "..", "assets")));
 
 /* =====================================================
-   DATABASE
+   DATABASE (Turso Cloud)
 ===================================================== */
 
-const db = new sqlite3.Database(
-    path.join(DATA_DIR, "database.db"),
-    (err) => {
-        if (err) console.error("DB Error:", err);
-        else console.log("✅ قاعدة البيانات متصلة");
-    }
-);
+const TURSO_URL   = process.env.TURSO_DATABASE_URL || "libsql://wolfcinema-db-abobakr9191.aws-eu-west-1.turso.io";
+const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
 
-/* جدول الأعمال */
-db.run(`
-    CREATE TABLE IF NOT EXISTS works (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        type TEXT NOT NULL,
-        year TEXT,
-        genre TEXT,
-        description TEXT,
-        poster TEXT,
-        video TEXT,
-        has_episodes INTEGER DEFAULT 0,
-        rating TEXT,
-        country TEXT,
-        language TEXT,
-        status TEXT,
-        featured INTEGER DEFAULT 0,
-        parent_id INTEGER DEFAULT NULL,
-        season_number INTEGER DEFAULT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-`);
+if (!TURSO_TOKEN) {
+    console.error("❌ خطأ: TURSO_AUTH_TOKEN مش موجود في المتغيرات");
+    process.exit(1);
+}
 
-/* ===== إضافة الحقول الجديدة (لو مش موجودة) ===== */
-db.all("PRAGMA table_info(works)", [], (err, cols) => {
-    if (err) return;
-
-    const existing = cols.map(c => c.name);
-
-    const newCols = [
-        { name: "rating",        type: "TEXT" },
-        { name: "country",       type: "TEXT" },
-        { name: "language",      type: "TEXT" },
-        { name: "status",        type: "TEXT" },
-        { name: "featured",      type: "INTEGER DEFAULT 0" },
-        { name: "parent_id",     type: "INTEGER DEFAULT NULL" },
-        { name: "season_number", type: "INTEGER DEFAULT NULL" }
-    ];
-
-    newCols.forEach(col => {
-        if (!existing.includes(col.name)) {
-            db.run(`ALTER TABLE works ADD COLUMN ${col.name} ${col.type}`, (e) => {
-                if (e) console.error(`خطأ في إضافة ${col.name}:`, e.message);
-                else console.log(`✅ تم إضافة عمود: ${col.name}`);
-            });
-        }
-    });
+const db = createClient({
+    url: TURSO_URL,
+    authToken: TURSO_TOKEN
 });
 
-/* جدول الحلقات */
-db.run(`
-    CREATE TABLE IF NOT EXISTS episodes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        work_id INTEGER NOT NULL,
-        season INTEGER DEFAULT 1,
-        number INTEGER NOT NULL,
-        title TEXT,
-        video TEXT,
-        poster TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-`);
-
-/* ===== إضافة عمود season (لو مش موجود) ===== */
-db.all("PRAGMA table_info(episodes)", [], (err, cols) => {
-    if (err) return;
-
-    const existing = cols.map(c => c.name);
-
-    if (!existing.includes("season")) {
-        db.run(`ALTER TABLE episodes ADD COLUMN season INTEGER DEFAULT 1`, (e) => {
-            if (e) console.error("خطأ في إضافة season:", e.message);
-            else console.log("✅ تم إضافة عمود: season");
-        });
-    }
-});
-
-/* جدول التقييمات */
-db.run(`
-    CREATE TABLE IF NOT EXISTS ratings (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        work_id INTEGER NOT NULL,
-        rating INTEGER NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-`);
-
-/* ===== جدول الرسائل ===== */
-db.run(`
-    CREATE TABLE IF NOT EXISTS messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        email TEXT NOT NULL,
-        subject TEXT,
-        message TEXT NOT NULL,
-        is_read INTEGER DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-`);
+console.log("✅ قاعدة البيانات (Turso) متصلة");
 
 /* =====================================================
-   MULTER
+   إنشاء الجداول
+===================================================== */
+
+async function initDatabase() {
+
+    try {
+
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS works (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                type TEXT NOT NULL,
+                year TEXT,
+                genre TEXT,
+                description TEXT,
+                poster TEXT,
+                video TEXT,
+                has_episodes INTEGER DEFAULT 0,
+                rating TEXT,
+                country TEXT,
+                language TEXT,
+                status TEXT,
+                featured INTEGER DEFAULT 0,
+                parent_id INTEGER DEFAULT NULL,
+                season_number INTEGER DEFAULT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS episodes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                work_id INTEGER NOT NULL,
+                season INTEGER DEFAULT 1,
+                number INTEGER NOT NULL,
+                title TEXT,
+                video TEXT,
+                poster TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS ratings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                work_id INTEGER NOT NULL,
+                rating INTEGER NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        await db.execute(`
+            CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL,
+                subject TEXT,
+                message TEXT NOT NULL,
+                is_read INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        console.log("✅ الجداول جاهزة");
+
+    } catch (err) {
+        console.error("❌ خطأ في إنشاء الجداول:", err.message);
+    }
+}
+
+initDatabase();
+
+/* =====================================================
+   MULTER (للصور والفيديوهات)
 ===================================================== */
 
 const storage = multer.diskStorage({
@@ -201,7 +179,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage,
-    limits: { fileSize: 1024 * 1024 * 1024 } /* 1GB */
+    limits: { fileSize: 1024 * 1024 * 1024 }
 });
 
 /* =====================================================
@@ -210,135 +188,124 @@ const upload = multer({
 
 /* --- اختبار --- */
 app.get("/api", (req, res) => {
-    res.json({ message: "WOLFCINEMA API شغال ✅" });
+    res.json({ message: "WOLFCINEMA API شغال ✅ (Turso)" });
 });
 
 /* --- إحصائيات --- */
-app.get("/api/stats", (req, res) => {
+app.get("/api/stats", async (req, res) => {
+    try {
+        const totalR    = await db.execute("SELECT COUNT(*) AS total FROM works");
+        const moviesR   = await db.execute("SELECT COUNT(*) AS c FROM works WHERE type='فيلم'");
+        const seriesR   = await db.execute("SELECT COUNT(*) AS c FROM works WHERE type='مسلسل'");
+        const animeR    = await db.execute("SELECT COUNT(*) AS c FROM works WHERE type='أنمي'");
+        const featuredR = await db.execute("SELECT COUNT(*) AS c FROM works WHERE featured=1");
+        const epsR      = await db.execute("SELECT COUNT(*) AS c FROM episodes");
+        const unreadR   = await db.execute("SELECT COUNT(*) AS c FROM messages WHERE is_read=0");
 
-    const stats = {};
-
-    db.get("SELECT COUNT(*) AS total FROM works", [], (e1, r1) => {
-        stats.total = r1 ? r1.total : 0;
-
-        db.get("SELECT COUNT(*) AS c FROM works WHERE type='فيلم'", [], (e2, r2) => {
-            stats.movies = r2 ? r2.c : 0;
-
-            db.get("SELECT COUNT(*) AS c FROM works WHERE type='مسلسل'", [], (e3, r3) => {
-                stats.series = r3 ? r3.c : 0;
-
-                db.get("SELECT COUNT(*) AS c FROM works WHERE type='أنمي'", [], (e4, r4) => {
-                    stats.anime = r4 ? r4.c : 0;
-
-                    db.get("SELECT COUNT(*) AS c FROM works WHERE featured=1", [], (e5, r5) => {
-                        stats.featured = r5 ? r5.c : 0;
-
-                        db.get("SELECT COUNT(*) AS c FROM episodes", [], (e6, r6) => {
-                            stats.episodes = r6 ? r6.c : 0;
-
-                            db.get("SELECT COUNT(*) AS c FROM messages WHERE is_read=0", [], (e7, r7) => {
-                                stats.unreadMessages = r7 ? r7.c : 0;
-                                res.json(stats);
-                            });
-                        });
-                    });
-                });
-            });
+        res.json({
+            total: Number(totalR.rows[0].total),
+            movies: Number(moviesR.rows[0].c),
+            series: Number(seriesR.rows[0].c),
+            anime: Number(animeR.rows[0].c),
+            featured: Number(featuredR.rows[0].c),
+            episodes: Number(epsR.rows[0].c),
+            unreadMessages: Number(unreadR.rows[0].c)
         });
-    });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-/* --- جلب الأعمال التي يمكن أن تكون "أب" --- */
-app.get("/api/parents", (req, res) => {
-    db.all(
-        `SELECT id, title, type, year FROM works
-         WHERE parent_id IS NULL
-         ORDER BY title ASC`,
-        [],
-        (err, rows) => {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json(rows || []);
-        }
-    );
+/* --- جلب الأعمال اللي تنفع تكون أب --- */
+app.get("/api/parents", async (req, res) => {
+    try {
+        const result = await db.execute(
+            `SELECT id, title, type, year FROM works
+             WHERE parent_id IS NULL
+             ORDER BY title ASC`
+        );
+        res.json(result.rows || []);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 /* --- جلب كل الأعمال --- */
-app.get("/api/works", (req, res) => {
-    const sql = `
-        SELECT
-            w.*,
-            (SELECT COUNT(*) FROM episodes WHERE work_id = w.id) AS episode_count,
-            (SELECT COUNT(*) FROM ratings WHERE work_id = w.id) AS rating_count,
-            (SELECT ROUND(AVG(rating), 1) FROM ratings WHERE work_id = w.id) AS avg_rating,
-            (SELECT COUNT(*) FROM works WHERE parent_id = w.id) AS season_count
-        FROM works w
-        ORDER BY w.created_at DESC
-    `;
-
-    db.all(sql, [], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(rows);
-    });
+app.get("/api/works", async (req, res) => {
+    try {
+        const result = await db.execute(`
+            SELECT
+                w.*,
+                (SELECT COUNT(*) FROM episodes WHERE work_id = w.id) AS episode_count,
+                (SELECT COUNT(*) FROM ratings WHERE work_id = w.id) AS rating_count,
+                (SELECT ROUND(AVG(rating), 1) FROM ratings WHERE work_id = w.id) AS avg_rating,
+                (SELECT COUNT(*) FROM works WHERE parent_id = w.id) AS season_count
+            FROM works w
+            ORDER BY w.created_at DESC
+        `);
+        res.json(result.rows || []);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 /* --- جلب عمل واحد + حلقاته أو مواسمه --- */
-app.get("/api/works/:id", (req, res) => {
+app.get("/api/works/:id", async (req, res) => {
+    try {
+        const workR = await db.execute({
+            sql: "SELECT * FROM works WHERE id = ?",
+            args: [req.params.id]
+        });
 
-    db.get("SELECT * FROM works WHERE id = ?", [req.params.id], (err, work) => {
+        if (!workR.rows.length) {
+            return res.status(404).json({ error: "العمل غير موجود" });
+        }
 
-        if (err) return res.status(500).json({ error: err.message });
-        if (!work) return res.status(404).json({ error: "العمل غير موجود" });
+        const work = workR.rows[0];
 
-        /* ===== نشوف لو ده أب عنده مواسم ===== */
-        db.all(
-            "SELECT * FROM works WHERE parent_id = ? ORDER BY season_number ASC, year ASC",
-            [req.params.id],
-            (err2, seasons) => {
+        /* نشوف لو ده أب عنده مواسم */
+        const seasonsR = await db.execute({
+            sql: "SELECT * FROM works WHERE parent_id = ? ORDER BY season_number ASC, year ASC",
+            args: [req.params.id]
+        });
 
-                if (err2) return res.status(500).json({ error: err2.message });
+        const seasons = seasonsR.rows || [];
 
-                if (seasons && seasons.length > 0) {
+        if (seasons.length > 0) {
 
-                    /* جلب كل حلقات المواسم في استعلام واحد */
-                    const seasonIds = seasons.map(s => s.id);
-                    const placeholders = seasonIds.map(() => "?").join(",");
+            const seasonIds = seasons.map(s => s.id);
+            const placeholders = seasonIds.map(() => "?").join(",");
 
-                    db.all(
-                        `SELECT * FROM episodes WHERE work_id IN (${placeholders}) ORDER BY season ASC, number ASC`,
-                        seasonIds,
-                        (err3, allEps) => {
+            const epsR = await db.execute({
+                sql: `SELECT * FROM episodes WHERE work_id IN (${placeholders}) ORDER BY season ASC, number ASC`,
+                args: seasonIds
+            });
 
-                            if (err3) return res.status(500).json({ error: err3.message });
+            const allEps = epsR.rows || [];
 
-                            seasons.forEach(s => {
-                                s.episodes = (allEps || []).filter(e => e.work_id === s.id);
-                            });
+            seasons.forEach(s => {
+                s.episodes = allEps.filter(e => e.work_id === s.id);
+            });
 
-                            work.seasons = seasons;
-                            work.episodes = [];
-                            res.json(work);
-                        }
-                    );
+            work.seasons = seasons;
+            work.episodes = [];
+            res.json(work);
 
-                } else {
+        } else {
 
-                    /* عمل عادي - جلب حلقاته */
-                    db.all(
-                        "SELECT * FROM episodes WHERE work_id = ? ORDER BY season ASC, number ASC",
-                        [req.params.id],
-                        (err4, episodes) => {
+            const epsR = await db.execute({
+                sql: "SELECT * FROM episodes WHERE work_id = ? ORDER BY season ASC, number ASC",
+                args: [req.params.id]
+            });
 
-                            if (err4) return res.status(500).json({ error: err4.message });
+            work.episodes = epsR.rows || [];
+            work.seasons = [];
+            res.json(work);
+        }
 
-                            work.episodes = episodes || [];
-                            work.seasons = [];
-                            res.json(work);
-                        }
-                    );
-                }
-            }
-        );
-    });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 /* --- إضافة عمل جديد --- */
@@ -348,66 +315,66 @@ app.post(
         { name: "poster", maxCount: 1 },
         { name: "video",  maxCount: 1 }
     ]),
-    (req, res) => {
+    async (req, res) => {
 
-        const {
-            title, type, year, genre, description, has_episodes,
-            rating, country, language, status, featured,
-            parent_id, season_number
-        } = req.body;
+        try {
 
-        if (!title || !type) {
-            return res.status(400).json({ error: "العنوان والنوع مطلوبان" });
-        }
-
-        const posterPath = req.files?.poster
-            ? "uploads/posters/" + req.files.poster[0].filename
-            : null;
-
-        const videoPath = req.files?.video
-            ? "uploads/videos/" + req.files.video[0].filename
-            : null;
-
-        const sql = `
-            INSERT INTO works (
-                title, type, year, genre, description,
-                poster, video, has_episodes,
+            const {
+                title, type, year, genre, description, has_episodes,
                 rating, country, language, status, featured,
                 parent_id, season_number
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `;
+            } = req.body;
 
-        db.run(
-            sql,
-            [
-                title,
-                type,
-                year    || null,
-                genre   || null,
-                description || null,
-                posterPath,
-                videoPath,
-                has_episodes === "true" ? 1 : 0,
-                rating   || null,
-                country  || null,
-                language || null,
-                status   || null,
-                featured === "true" ? 1 : 0,
-                parent_id || null,
-                season_number || null
-            ],
-            function (err) {
-
-                if (err) return res.status(500).json({ error: err.message });
-
-                res.json({
-                    success: true,
-                    id: this.lastID,
-                    message: "تمت إضافة العمل"
-                });
+            if (!title || !type) {
+                return res.status(400).json({ error: "العنوان والنوع مطلوبان" });
             }
-        );
+
+            const posterPath = req.files?.poster
+                ? "uploads/posters/" + req.files.poster[0].filename
+                : null;
+
+            const videoPath = req.files?.video
+                ? "uploads/videos/" + req.files.video[0].filename
+                : null;
+
+            const result = await db.execute({
+                sql: `
+                    INSERT INTO works (
+                        title, type, year, genre, description,
+                        poster, video, has_episodes,
+                        rating, country, language, status, featured,
+                        parent_id, season_number
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `,
+                args: [
+                    title,
+                    type,
+                    year || null,
+                    genre || null,
+                    description || null,
+                    posterPath,
+                    videoPath,
+                    has_episodes === "true" ? 1 : 0,
+                    rating || null,
+                    country || null,
+                    language || null,
+                    status || null,
+                    featured === "true" ? 1 : 0,
+                    parent_id || null,
+                    season_number || null
+                ]
+            });
+
+            res.json({
+                success: true,
+                id: Number(result.lastInsertRowid),
+                message: "تمت إضافة العمل"
+            });
+
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
     }
 );
 
@@ -418,92 +385,95 @@ app.put(
         { name: "poster", maxCount: 1 },
         { name: "video",  maxCount: 1 }
     ]),
-    (req, res) => {
+    async (req, res) => {
 
-        const {
-            title, type, year, genre, description,
-            rating, country, language, status, featured,
-            parent_id, season_number
-        } = req.body;
+        try {
 
-        db.get(
-            "SELECT poster, video FROM works WHERE id = ?",
-            [req.params.id],
-            (err, oldWork) => {
+            const {
+                title, type, year, genre, description,
+                rating, country, language, status, featured,
+                parent_id, season_number
+            } = req.body;
 
-                if (err) return res.status(500).json({ error: err.message });
-                if (!oldWork) return res.status(404).json({ error: "العمل غير موجود" });
+            const oldR = await db.execute({
+                sql: "SELECT poster, video FROM works WHERE id = ?",
+                args: [req.params.id]
+            });
 
-                const newPoster = req.files?.poster
-                    ? "uploads/posters/" + req.files.poster[0].filename
-                    : null;
+            if (!oldR.rows.length) {
+                return res.status(404).json({ error: "العمل غير موجود" });
+            }
 
-                const newVideo = req.files?.video
-                    ? "uploads/videos/" + req.files.video[0].filename
-                    : null;
+            const oldWork = oldR.rows[0];
 
-                if (newPoster && oldWork.poster) {
-                    const full = path.join(DATA_DIR, oldWork.poster);
-                    if (fs.existsSync(full)) fs.unlinkSync(full);
-                }
+            const newPoster = req.files?.poster
+                ? "uploads/posters/" + req.files.poster[0].filename
+                : null;
 
-                if (newVideo && oldWork.video) {
-                    const full = path.join(DATA_DIR, oldWork.video);
-                    if (fs.existsSync(full)) fs.unlinkSync(full);
-                }
+            const newVideo = req.files?.video
+                ? "uploads/videos/" + req.files.video[0].filename
+                : null;
 
-                const finalPoster = newPoster || oldWork.poster;
-                const finalVideo  = newVideo  || oldWork.video;
+            if (newPoster && oldWork.poster) {
+                const full = path.join(DATA_DIR, oldWork.poster);
+                if (fs.existsSync(full)) fs.unlinkSync(full);
+            }
 
-                const sql = `
+            if (newVideo && oldWork.video) {
+                const full = path.join(DATA_DIR, oldWork.video);
+                if (fs.existsSync(full)) fs.unlinkSync(full);
+            }
+
+            const finalPoster = newPoster || oldWork.poster;
+            const finalVideo  = newVideo  || oldWork.video;
+
+            await db.execute({
+                sql: `
                     UPDATE works SET
                         title = ?, type = ?, year = ?, genre = ?, description = ?,
                         rating = ?, country = ?, language = ?, status = ?, featured = ?,
                         poster = ?, video = ?,
                         parent_id = ?, season_number = ?
                     WHERE id = ?
-                `;
+                `,
+                args: [
+                    title || "",
+                    type || "",
+                    year || null,
+                    genre || null,
+                    description || null,
+                    rating || null,
+                    country || null,
+                    language || null,
+                    status || null,
+                    featured === "true" || featured === 1 ? 1 : 0,
+                    finalPoster,
+                    finalVideo,
+                    parent_id || null,
+                    season_number || null,
+                    req.params.id
+                ]
+            });
 
-                db.run(
-                    sql,
-                    [
-                        title || "",
-                        type || "",
-                        year || null,
-                        genre || null,
-                        description || null,
-                        rating || null,
-                        country || null,
-                        language || null,
-                        status || null,
-                        featured === "true" || featured === 1 ? 1 : 0,
-                        finalPoster,
-                        finalVideo,
-                        parent_id || null,
-                        season_number || null,
-                        req.params.id
-                    ],
-                    function (err2) {
+            res.json({ success: true, message: "تم التعديل" });
 
-                        if (err2) return res.status(500).json({ error: err2.message });
-
-                        res.json({
-                            success: true,
-                            message: "تم التعديل"
-                        });
-                    }
-                );
-            }
-        );
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
     }
 );
 
 /* --- حذف عمل --- */
-app.delete("/api/works/:id", (req, res) => {
+app.delete("/api/works/:id", async (req, res) => {
+    try {
 
-    db.get("SELECT poster, video FROM works WHERE id = ?", [req.params.id], (err, row) => {
+        const rowR = await db.execute({
+            sql: "SELECT poster, video FROM works WHERE id = ?",
+            args: [req.params.id]
+        });
 
-        if (row) {
+        if (rowR.rows.length) {
+            const row = rowR.rows[0];
             [row.poster, row.video].forEach(p => {
                 if (p) {
                     const full = path.join(DATA_DIR, p);
@@ -512,20 +482,31 @@ app.delete("/api/works/:id", (req, res) => {
             });
         }
 
-        /* امسح الحلقات المرتبطة */
-        db.run("DELETE FROM episodes WHERE work_id = ?", [req.params.id]);
-
-        /* امسح التقييمات المرتبطة */
-        db.run("DELETE FROM ratings WHERE work_id = ?", [req.params.id]);
-
-        /* امسح مواسم الأبناء لو ده أب */
-        db.run("UPDATE works SET parent_id = NULL WHERE parent_id = ?", [req.params.id]);
-
-        db.run("DELETE FROM works WHERE id = ?", [req.params.id], function (err2) {
-            if (err2) return res.status(500).json({ error: err2.message });
-            res.json({ success: true, message: "تم الحذف" });
+        await db.execute({
+            sql: "DELETE FROM episodes WHERE work_id = ?",
+            args: [req.params.id]
         });
-    });
+
+        await db.execute({
+            sql: "DELETE FROM ratings WHERE work_id = ?",
+            args: [req.params.id]
+        });
+
+        await db.execute({
+            sql: "UPDATE works SET parent_id = NULL WHERE parent_id = ?",
+            args: [req.params.id]
+        });
+
+        await db.execute({
+            sql: "DELETE FROM works WHERE id = ?",
+            args: [req.params.id]
+        });
+
+        res.json({ success: true, message: "تم الحذف" });
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 /* --- إضافة حلقة --- */
@@ -535,47 +516,56 @@ app.post(
         { name: "episode_poster", maxCount: 1 },
         { name: "episode_video",  maxCount: 1 }
     ]),
-    (req, res) => {
+    async (req, res) => {
 
-        const { number, title, season } = req.body;
+        try {
 
-        if (!number) {
-            return res.status(400).json({ error: "رقم الحلقة مطلوب" });
-        }
+            const { number, title, season } = req.body;
 
-        const posterPath = req.files?.episode_poster
-            ? "uploads/posters/" + req.files.episode_poster[0].filename
-            : null;
-
-        const videoPath = req.files?.episode_video
-            ? "uploads/videos/" + req.files.episode_video[0].filename
-            : null;
-
-        db.run(
-            `INSERT INTO episodes (work_id, season, number, title, video, poster)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [
-                req.params.id,
-                season || 1,
-                number,
-                title || null,
-                videoPath,
-                posterPath
-            ],
-            function (err) {
-                if (err) return res.status(500).json({ error: err.message });
-                res.json({ success: true, id: this.lastID });
+            if (!number) {
+                return res.status(400).json({ error: "رقم الحلقة مطلوب" });
             }
-        );
+
+            const posterPath = req.files?.episode_poster
+                ? "uploads/posters/" + req.files.episode_poster[0].filename
+                : null;
+
+            const videoPath = req.files?.episode_video
+                ? "uploads/videos/" + req.files.episode_video[0].filename
+                : null;
+
+            const result = await db.execute({
+                sql: `INSERT INTO episodes (work_id, season, number, title, video, poster)
+                      VALUES (?, ?, ?, ?, ?, ?)`,
+                args: [
+                    req.params.id,
+                    season || 1,
+                    number,
+                    title || null,
+                    videoPath,
+                    posterPath
+                ]
+            });
+
+            res.json({ success: true, id: Number(result.lastInsertRowid) });
+
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
     }
 );
 
 /* --- حذف حلقة --- */
-app.delete("/api/episodes/:id", (req, res) => {
+app.delete("/api/episodes/:id", async (req, res) => {
+    try {
 
-    db.get("SELECT video, poster FROM episodes WHERE id = ?", [req.params.id], (err, row) => {
+        const rowR = await db.execute({
+            sql: "SELECT video, poster FROM episodes WHERE id = ?",
+            args: [req.params.id]
+        });
 
-        if (row) {
+        if (rowR.rows.length) {
+            const row = rowR.rows[0];
             [row.video, row.poster].forEach(p => {
                 if (p) {
                     const full = path.join(DATA_DIR, p);
@@ -584,149 +574,147 @@ app.delete("/api/episodes/:id", (req, res) => {
             });
         }
 
-        db.run("DELETE FROM episodes WHERE id = ?", [req.params.id], function (err2) {
-            if (err2) return res.status(500).json({ error: err2.message });
-            res.json({ success: true });
+        await db.execute({
+            sql: "DELETE FROM episodes WHERE id = ?",
+            args: [req.params.id]
         });
-    });
+
+        res.json({ success: true });
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 /* --- إرسال تقييم --- */
-app.post("/api/works/:id/rate", (req, res) => {
+app.post("/api/works/:id/rate", async (req, res) => {
+    try {
 
-    const { rating } = req.body;
-    const workId = req.params.id;
+        const { rating } = req.body;
+        const workId = req.params.id;
 
-    const value = parseInt(rating);
-    if (!value || value < 1 || value > 5) {
-        return res.status(400).json({ error: "التقييم لازم يكون بين 1 و 5" });
+        const value = parseInt(rating);
+        if (!value || value < 1 || value > 5) {
+            return res.status(400).json({ error: "التقييم لازم يكون بين 1 و 5" });
+        }
+
+        const workR = await db.execute({
+            sql: "SELECT id FROM works WHERE id = ?",
+            args: [workId]
+        });
+
+        if (!workR.rows.length) {
+            return res.status(404).json({ error: "العمل غير موجود" });
+        }
+
+        await db.execute({
+            sql: "INSERT INTO ratings (work_id, rating) VALUES (?, ?)",
+            args: [workId, value]
+        });
+
+        const statsR = await db.execute({
+            sql: `SELECT COUNT(*) AS count, ROUND(AVG(rating), 1) AS avg
+                  FROM ratings WHERE work_id = ?`,
+            args: [workId]
+        });
+
+        res.json({
+            success: true,
+            rating_count: Number(statsR.rows[0].count),
+            avg_rating: Number(statsR.rows[0].avg)
+        });
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
-
-    db.get("SELECT id FROM works WHERE id = ?", [workId], (err, work) => {
-
-        if (err) return res.status(500).json({ error: err.message });
-        if (!work) return res.status(404).json({ error: "العمل غير موجود" });
-
-        db.run(
-            "INSERT INTO ratings (work_id, rating) VALUES (?, ?)",
-            [workId, value],
-            function (err2) {
-
-                if (err2) return res.status(500).json({ error: err2.message });
-
-                db.get(
-                    `SELECT
-                        COUNT(*) AS count,
-                        ROUND(AVG(rating), 1) AS avg
-                     FROM ratings WHERE work_id = ?`,
-                    [workId],
-                    (err3, stats) => {
-
-                        if (err3) return res.status(500).json({ error: err3.message });
-
-                        res.json({
-                            success: true,
-                            rating_count: stats.count,
-                            avg_rating: stats.avg
-                        });
-                    }
-                );
-            }
-        );
-    });
 });
 
-/* --- حذف تقييم (للاختبار) --- */
-app.delete("/api/works/:id/rate", (req, res) => {
-    db.run(
-        "DELETE FROM ratings WHERE work_id = ?",
-        [req.params.id],
-        function (err) {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ success: true, deleted: this.changes });
-        }
-    );
+/* --- حذف تقييم --- */
+app.delete("/api/works/:id/rate", async (req, res) => {
+    try {
+        const result = await db.execute({
+            sql: "DELETE FROM ratings WHERE work_id = ?",
+            args: [req.params.id]
+        });
+        res.json({ success: true, deleted: Number(result.rowsAffected) });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 /* =====================================================
    CONTACT MESSAGES
 ===================================================== */
 
-/* --- إرسال رسالة --- */
-app.post("/api/messages", (req, res) => {
+app.post("/api/messages", async (req, res) => {
+    try {
+        const { name, email, subject, message } = req.body;
 
-    const { name, email, subject, message } = req.body;
+        if (!name || !email || !message) {
+            return res.status(400).json({ error: "الاسم والبريد والرسالة مطلوبين" });
+        }
 
-    if (!name || !email || !message) {
-        return res.status(400).json({ error: "الاسم والبريد والرسالة مطلوبين" });
+        const result = await db.execute({
+            sql: `INSERT INTO messages (name, email, subject, message) VALUES (?, ?, ?, ?)`,
+            args: [name, email, subject || null, message]
+        });
+
+        res.json({ success: true, id: Number(result.lastInsertRowid) });
+
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
-
-    db.run(
-        `INSERT INTO messages (name, email, subject, message)
-         VALUES (?, ?, ?, ?)`,
-        [name, email, subject || null, message],
-        function (err) {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ success: true, id: this.lastID });
-        }
-    );
 });
 
-/* --- جلب كل الرسائل (للأدمن) --- */
-app.get("/api/messages", (req, res) => {
-    db.all(
-        "SELECT * FROM messages ORDER BY created_at DESC",
-        [],
-        (err, rows) => {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json(rows || []);
-        }
-    );
+app.get("/api/messages", async (req, res) => {
+    try {
+        const result = await db.execute("SELECT * FROM messages ORDER BY created_at DESC");
+        res.json(result.rows || []);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-/* --- عدد الرسائل غير المقروءة --- */
-app.get("/api/messages/unread/count", (req, res) => {
-    db.get(
-        "SELECT COUNT(*) AS count FROM messages WHERE is_read = 0",
-        [],
-        (err, row) => {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ count: row ? row.count : 0 });
-        }
-    );
+app.get("/api/messages/unread/count", async (req, res) => {
+    try {
+        const result = await db.execute("SELECT COUNT(*) AS count FROM messages WHERE is_read = 0");
+        res.json({ count: Number(result.rows[0].count) });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-/* --- تعليم رسالة كمقروءة --- */
-app.put("/api/messages/:id/read", (req, res) => {
-    db.run(
-        "UPDATE messages SET is_read = 1 WHERE id = ?",
-        [req.params.id],
-        function (err) {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ success: true });
-        }
-    );
+app.put("/api/messages/:id/read", async (req, res) => {
+    try {
+        await db.execute({
+            sql: "UPDATE messages SET is_read = 1 WHERE id = ?",
+            args: [req.params.id]
+        });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-/* --- حذف رسالة --- */
-app.delete("/api/messages/:id", (req, res) => {
-    db.run(
-        "DELETE FROM messages WHERE id = ?",
-        [req.params.id],
-        function (err) {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ success: true });
-        }
-    );
+app.delete("/api/messages/:id", async (req, res) => {
+    try {
+        await db.execute({
+            sql: "DELETE FROM messages WHERE id = ?",
+            args: [req.params.id]
+        });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 /* =====================================================
    تشغيل السيرفر
 ===================================================== */
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
     console.log("=====================================");
-    console.log("🎬 WOLFCINEMA Backend شغال");
+    console.log("🎬 WOLFCINEMA Backend شغال (Turso)");
     console.log(`🌐 API: http://localhost:${PORT}`);
     console.log(`🔒 الداشبورد محمي بكلمة سر`);
     console.log(`📁 مجلد البيانات: ${DATA_DIR}`);
