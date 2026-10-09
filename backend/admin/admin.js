@@ -1,9 +1,16 @@
 /* =====================================================
-   WOLFCINEMA ADMIN PANEL — PRO
+   WOLFCINEMA ADMIN PANEL — PRO (Dynamic API URL)
 ===================================================== */
 
-const API = "http://localhost:3000/api";
-const SERVER_URL = "http://localhost:3000";
+/* 
+   الرابط بيتحدد تلقائيًا حسب الدومين اللي فاتح منه الصفحة:
+   - من localhost:3000 → هيستخدم localhost:3000
+   - من أي دومين تاني (Cloudflare, Vercel, Fly) → هيستخدم نفس الدومين
+*/
+
+const API_BASE   = window.location.origin;
+const API        = API_BASE + "/api";
+const SERVER_URL = API_BASE;
 
 let currentWorkId = null;
 let selectedGenres = [];
