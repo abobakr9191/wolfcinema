@@ -26,13 +26,16 @@
       "use": "@vercel/static"
     }
   ],
+  "redirects": [
+    { "source": "/admin", "destination": "/admin/", "permanent": false }
+  ],
   "routes": [
     {
       "src": "/api/(.*)",
       "dest": "backend/server.js"
     },
     {
-      "src": "/admin",
+      "src": "/admin/",
       "dest": "/backend/admin/index.html"
     },
     {
