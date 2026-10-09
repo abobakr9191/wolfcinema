@@ -1,5 +1,5 @@
 /* =====================================================
-   WOLFCINEMA — BACKEND SERVER (Turso Edition)
+   WOLFCINEMA — BACKEND SERVER (Turso Edition) - FIXED
 ===================================================== */
 
 const express = require("express");
@@ -12,16 +12,35 @@ const { createClient } = require("@libsql/client");
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-/* ===== مجلد البيانات ===== */
-/* Vercel: نستخدم /tmp (المسموح بالكتابة فقط) */
-/* محليًا: نستخدم مجلد المشروع */
+/* ===== إعداد قاعدة البيانات ===== */
+/* الإنتاج (Vercel / Fly.io): Turso Cloud */
+/* التطوير المحلي: SQLite ملف محلي */
 
+const TURSO_URL   = process.env.TURSO_DATABASE_URL;
+const TURSO_AUTH_TOKEN = process.env.TURSO_AUTH_TOKEN;
+
+let db;
+
+if (TURSO_URL && TURSO_AUTH_TOKEN) {
+    db = createClient({
+        url: TURSO_URL,
+        authToken: TURSO_AUTH_TOKEN
+    });
+    console.log("✅ متصل بـ Turso Cloud");
+} else {
+    const localDbPath = path.join(__dirname, "database.db");
+    db = createClient({
+        url: "file:" + localDbPath
+    });
+    console.log("✅ متصل بـ SQLite المحلي:", localDbPath);
+}
+
+/* ===== مجلد البيانات ===== */
 const isVercel = process.env.VERCEL === "1";
 const DATA_DIR = isVercel
     ? "/tmp"
     : (process.env.DATA_DIR || __dirname);
 
-/* محاولة إنشاء المجلدات (بس مش إجباري) */
 function safeMkdir(dir) {
     try {
         if (!fs.existsSync(dir)) {
@@ -43,14 +62,26 @@ const POSTERS_DIR = path.join(UPLOADS_DIR, "posters");
 const VIDEOS_DIR  = path.join(UPLOADS_DIR, "videos");
 
 [UPLOADS_DIR, POSTERS_DIR, VIDEOS_DIR].forEach(safeMkdir);
+
+/* =====================================================
+   خدمة الملفات الثابتة (Static Files)
+===================================================== */
+
+/* ←←← ده أهم سطر ناقص: بيقدم لوحة التحكم */
+app.use("/admin", express.static(path.join(__dirname, "admin")));
+
+/* خدمة الصور والفيديوهات */
+app.use("/uploads", express.static(UPLOADS_DIR));
+
+/* خدمة ملفات الواجهة الأمامية لو موجودة */
+app.use(express.static(path.join(__dirname, "..")));
+
 /* =====================================================
    إنشاء الجداول
 ===================================================== */
 
 async function initDatabase() {
-
     try {
-
         await db.execute(`
             CREATE TABLE IF NOT EXISTS works (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -108,7 +139,6 @@ async function initDatabase() {
         `);
 
         console.log("✅ الجداول جاهزة");
-
     } catch (err) {
         console.error("❌ خطأ في إنشاء الجداول:", err.message);
     }
@@ -117,7 +147,7 @@ async function initDatabase() {
 initDatabase();
 
 /* =====================================================
-   MULTER (للصور والفيديوهات)
+   MULTER
 ===================================================== */
 
 const storage = multer.diskStorage({
@@ -143,12 +173,10 @@ const upload = multer({
    API ROUTES
 ===================================================== */
 
-/* --- اختبار --- */
 app.get("/api", (req, res) => {
     res.json({ message: "WOLFCINEMA API شغال ✅ (Turso)" });
 });
 
-/* --- إحصائيات --- */
 app.get("/api/stats", async (req, res) => {
     try {
         const totalR    = await db.execute("SELECT COUNT(*) AS total FROM works");
@@ -173,7 +201,6 @@ app.get("/api/stats", async (req, res) => {
     }
 });
 
-/* --- جلب الأعمال اللي تنفع تكون أب --- */
 app.get("/api/parents", async (req, res) => {
     try {
         const result = await db.execute(
@@ -187,7 +214,6 @@ app.get("/api/parents", async (req, res) => {
     }
 });
 
-/* --- جلب كل الأعمال --- */
 app.get("/api/works", async (req, res) => {
     try {
         const result = await db.execute(`
@@ -206,7 +232,6 @@ app.get("/api/works", async (req, res) => {
     }
 });
 
-/* --- جلب عمل واحد + حلقاته أو مواسمه --- */
 app.get("/api/works/:id", async (req, res) => {
     try {
         const workR = await db.execute({
@@ -220,7 +245,6 @@ app.get("/api/works/:id", async (req, res) => {
 
         const work = workR.rows[0];
 
-        /* نشوف لو ده أب عنده مواسم */
         const seasonsR = await db.execute({
             sql: "SELECT * FROM works WHERE parent_id = ? ORDER BY season_number ASC, year ASC",
             args: [req.params.id]
@@ -229,7 +253,6 @@ app.get("/api/works/:id", async (req, res) => {
         const seasons = seasonsR.rows || [];
 
         if (seasons.length > 0) {
-
             const seasonIds = seasons.map(s => s.id);
             const placeholders = seasonIds.map(() => "?").join(",");
 
@@ -239,7 +262,6 @@ app.get("/api/works/:id", async (req, res) => {
             });
 
             const allEps = epsR.rows || [];
-
             seasons.forEach(s => {
                 s.episodes = allEps.filter(e => e.work_id === s.id);
             });
@@ -247,9 +269,7 @@ app.get("/api/works/:id", async (req, res) => {
             work.seasons = seasons;
             work.episodes = [];
             res.json(work);
-
         } else {
-
             const epsR = await db.execute({
                 sql: "SELECT * FROM episodes WHERE work_id = ? ORDER BY season ASC, number ASC",
                 args: [req.params.id]
@@ -259,13 +279,11 @@ app.get("/api/works/:id", async (req, res) => {
             work.seasons = [];
             res.json(work);
         }
-
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-/* --- إضافة عمل جديد --- */
 app.post(
     "/api/works",
     upload.fields([
@@ -273,9 +291,7 @@ app.post(
         { name: "video",  maxCount: 1 }
     ]),
     async (req, res) => {
-
         try {
-
             const {
                 title, type, year, genre, description, has_episodes,
                 rating, country, language, status, featured,
@@ -328,14 +344,12 @@ app.post(
                 id: Number(result.lastInsertRowid),
                 message: "تمت إضافة العمل"
             });
-
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
     }
 );
 
-/* --- تعديل عمل --- */
 app.put(
     "/api/works/:id",
     upload.fields([
@@ -343,9 +357,7 @@ app.put(
         { name: "video",  maxCount: 1 }
     ]),
     async (req, res) => {
-
         try {
-
             const {
                 title, type, year, genre, description,
                 rating, country, language, status, featured,
@@ -413,17 +425,14 @@ app.put(
             });
 
             res.json({ success: true, message: "تم التعديل" });
-
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
     }
 );
 
-/* --- حذف عمل --- */
 app.delete("/api/works/:id", async (req, res) => {
     try {
-
         const rowR = await db.execute({
             sql: "SELECT poster, video FROM works WHERE id = ?",
             args: [req.params.id]
@@ -439,34 +448,17 @@ app.delete("/api/works/:id", async (req, res) => {
             });
         }
 
-        await db.execute({
-            sql: "DELETE FROM episodes WHERE work_id = ?",
-            args: [req.params.id]
-        });
-
-        await db.execute({
-            sql: "DELETE FROM ratings WHERE work_id = ?",
-            args: [req.params.id]
-        });
-
-        await db.execute({
-            sql: "UPDATE works SET parent_id = NULL WHERE parent_id = ?",
-            args: [req.params.id]
-        });
-
-        await db.execute({
-            sql: "DELETE FROM works WHERE id = ?",
-            args: [req.params.id]
-        });
+        await db.execute({ sql: "DELETE FROM episodes WHERE work_id = ?", args: [req.params.id] });
+        await db.execute({ sql: "DELETE FROM ratings WHERE work_id = ?", args: [req.params.id] });
+        await db.execute({ sql: "UPDATE works SET parent_id = NULL WHERE parent_id = ?", args: [req.params.id] });
+        await db.execute({ sql: "DELETE FROM works WHERE id = ?", args: [req.params.id] });
 
         res.json({ success: true, message: "تم الحذف" });
-
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-/* --- إضافة حلقة --- */
 app.post(
     "/api/works/:id/episodes",
     upload.fields([
@@ -474,9 +466,7 @@ app.post(
         { name: "episode_video",  maxCount: 1 }
     ]),
     async (req, res) => {
-
         try {
-
             const { number, title, season } = req.body;
 
             if (!number) {
@@ -505,17 +495,14 @@ app.post(
             });
 
             res.json({ success: true, id: Number(result.lastInsertRowid) });
-
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
     }
 );
 
-/* --- حذف حلقة --- */
 app.delete("/api/episodes/:id", async (req, res) => {
     try {
-
         const rowR = await db.execute({
             sql: "SELECT video, poster FROM episodes WHERE id = ?",
             args: [req.params.id]
@@ -531,22 +518,15 @@ app.delete("/api/episodes/:id", async (req, res) => {
             });
         }
 
-        await db.execute({
-            sql: "DELETE FROM episodes WHERE id = ?",
-            args: [req.params.id]
-        });
-
+        await db.execute({ sql: "DELETE FROM episodes WHERE id = ?", args: [req.params.id] });
         res.json({ success: true });
-
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-/* --- إرسال تقييم --- */
 app.post("/api/works/:id/rate", async (req, res) => {
     try {
-
         const { rating } = req.body;
         const workId = req.params.id;
 
@@ -580,13 +560,11 @@ app.post("/api/works/:id/rate", async (req, res) => {
             rating_count: Number(statsR.rows[0].count),
             avg_rating: Number(statsR.rows[0].avg)
         });
-
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-/* --- حذف تقييم --- */
 app.delete("/api/works/:id/rate", async (req, res) => {
     try {
         const result = await db.execute({
@@ -617,7 +595,6 @@ app.post("/api/messages", async (req, res) => {
         });
 
         res.json({ success: true, id: Number(result.lastInsertRowid) });
-
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -669,19 +646,14 @@ app.delete("/api/messages/:id", async (req, res) => {
    تشغيل السيرفر
 ===================================================== */
 
-/* =====================================================
-   Vercel Serverless Export
-===================================================== */
-
 module.exports = app;
 
-/* شغّل السيرفر محليًا لو مش على Vercel */
 if (process.env.VERCEL !== "1") {
     app.listen(PORT, "0.0.0.0", () => {
         console.log("=====================================");
         console.log("🎬 WOLFCINEMA Backend شغال (Turso)");
         console.log(`🌐 API: http://localhost:${PORT}`);
-        console.log(`🔒 الداشبورد محمي بكلمة سر`);
+        console.log(`🔒 الداشبورد: http://localhost:${PORT}/admin`);
         console.log(`📁 مجلد البيانات: ${DATA_DIR}`);
         console.log("=====================================");
     });
