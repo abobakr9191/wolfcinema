@@ -712,11 +712,20 @@ app.delete("/api/messages/:id", async (req, res) => {
    تشغيل السيرفر
 ===================================================== */
 
-app.listen(PORT, "0.0.0.0", () => {
-    console.log("=====================================");
-    console.log("🎬 WOLFCINEMA Backend شغال (Turso)");
-    console.log(`🌐 API: http://localhost:${PORT}`);
-    console.log(`🔒 الداشبورد محمي بكلمة سر`);
-    console.log(`📁 مجلد البيانات: ${DATA_DIR}`);
-    console.log("=====================================");
-});
+/* =====================================================
+   Vercel Serverless Export
+===================================================== */
+
+module.exports = app;
+
+/* شغّل السيرفر محليًا لو مش على Vercel */
+if (process.env.VERCEL !== "1") {
+    app.listen(PORT, "0.0.0.0", () => {
+        console.log("=====================================");
+        console.log("🎬 WOLFCINEMA Backend شغال (Turso)");
+        console.log(`🌐 API: http://localhost:${PORT}`);
+        console.log(`🔒 الداشبورد محمي بكلمة سر`);
+        console.log(`📁 مجلد البيانات: ${DATA_DIR}`);
+        console.log("=====================================");
+    });
+}
