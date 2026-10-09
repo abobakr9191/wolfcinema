@@ -8,8 +8,8 @@
 "use strict";
 
 /* ===== Dynamic API URL ===== */
-const API_URL     = window.location.origin + "/api";
-const SERVER_URL  = window.location.origin;
+const API_URL     = "https://wolfcinema.vercel.app/api";
+const SERVER_URL  = "https://wolfcinema.vercel.app";
 const HISTORY_KEY = "wolfcinema_watch_history";
 
 /* =====================================================
