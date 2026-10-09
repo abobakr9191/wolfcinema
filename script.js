@@ -141,7 +141,7 @@ function initializeHomePage() {
    BACKEND INTEGRATION (additive)
 ===================================================== */
 
-const API_URL = "http://localhost:3000/api";
+const API_URL = window.location.origin + "/api";
 const SERVER_URL = "http://localhost:3000";
 
 async function loadFromBackend() {
