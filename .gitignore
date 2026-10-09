@@ -1,6 +1,5 @@
 node_modules/
 backend/database.db
-backend/uploads/
 
 .DS_Store
 Thumbs.db
