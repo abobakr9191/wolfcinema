@@ -539,7 +539,36 @@ document.addEventListener("DOMContentLoaded", async () => {
             document.addEventListener("mousemove", onMove);
             document.addEventListener("mouseup", onUp);
         });
+/* =====================================================
+   إخفاء التايم لاين عند خروج الماوس منه
+===================================================== */
 
+let timelineHideTimer = null;
+
+progressWrap.addEventListener("mouseenter", () => {
+    clearTimeout(timelineHideTimer);
+    progressWrap.classList.remove("timeline-hidden");
+});
+
+progressWrap.addEventListener("mouseleave", () => {
+    clearTimeout(timelineHideTimer);
+    timelineHideTimer = setTimeout(() => {
+        if (!video.paused) {
+            progressWrap.classList.add("timeline-hidden");
+        }
+    }, 400);
+});
+
+/* إظهاره تاني لما الماوس يتحرك على المشغل */
+player.addEventListener("mousemove", () => {
+    clearTimeout(timelineHideTimer);
+    progressWrap.classList.remove("timeline-hidden");
+});
+
+/* خليه ظاهر دايماً لما الفيديو يكون واقف */
+video.addEventListener("pause", () => {
+    progressWrap.classList.remove("timeline-hidden");
+});
         progressWrap.addEventListener("mousemove", (e) => {
             const rect = progressWrap.getBoundingClientRect();
             let x = e.clientX - rect.left;

@@ -7093,3 +7093,13 @@ body.categories-open {
     .qa-btn { width: 34px; height: 34px; font-size: 15px; }
     .cinema-skip-intro { bottom: 120px; right: 16px; padding: 10px 16px; font-size: 12px; }
 }
+/* إخفاء التايم لاين عند خروج الماوس */
+.cinema-progress-wrap {
+    transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.cinema-progress-wrap.timeline-hidden {
+    opacity: 0;
+    transform: translateY(8px);
+    pointer-events: none;
+}
