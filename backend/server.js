@@ -1,5 +1,5 @@
 /* =====================================================
-   WOLFCINEMA — BACKEND SERVER (Turso Edition) - FINAL
+   WOLFCINEMA — BACKEND SERVER (Turso Edition) - FINAL v2
 ===================================================== */
 
 const express = require("express");
@@ -10,6 +10,8 @@ const multer  = require("multer");
 const { createClient } = require("@libsql/client");
 
 const app  = express();
+const PORT = process.env.PORT || 3000;
+
 /* ===== CORS — يدوي صريح ===== */
 app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -17,78 +19,68 @@ app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
     res.setHeader("Access-Control-Max-Age", "86400");
 
-    // Handle preflight
     if (req.method === "OPTIONS") {
         return res.status(200).end();
     }
 
     next();
 });
-const PORT = process.env.PORT || 3000;
 
 /* ===== إعداد قاعدة البيانات ===== */
-
-const TURSO_URL   = process.env.TURSO_DATABASE_URL;
+const TURSO_URL        = process.env.TURSO_DATABASE_URL;
 const TURSO_AUTH_TOKEN = process.env.TURSO_AUTH_TOKEN;
 
 let db;
 
 if (TURSO_URL && TURSO_AUTH_TOKEN) {
-    db = createClient({
-        url: TURSO_URL,
-        authToken: TURSO_AUTH_TOKEN
-    });
+    db = createClient({ url: TURSO_URL, authToken: TURSO_AUTH_TOKEN });
     console.log("✅ متصل بـ Turso Cloud");
 } else {
     const localDbPath = path.join(__dirname, "database.db");
-    db = createClient({
-        url: "file:" + localDbPath
-    });
+    db = createClient({ url: "file:" + localDbPath });
     console.log("✅ متصل بـ SQLite المحلي:", localDbPath);
 }
 
-/* ===== مجلد البيانات ===== */
+/* ===== مسارات الملفات ===== */
 const isVercel = process.env.VERCEL === "1";
-const DATA_DIR = isVercel
-    ? "/tmp"
-    : (process.env.DATA_DIR || __dirname);
+
+/* مجلد الكتابة (المؤقت على Vercel) */
+const DATA_DIR       = isVercel ? "/tmp" : (process.env.DATA_DIR || __dirname);
+const WRITE_DIR      = path.join(DATA_DIR, "uploads");
+const WRITE_POSTERS  = path.join(WRITE_DIR, "posters");
+const WRITE_VIDEOS   = path.join(WRITE_DIR, "videos");
+
+/* مجلد القراءة (الريبو، دايماً موجود) */
+const REPO_UPLOADS   = path.join(__dirname, "uploads");
+const REPO_POSTERS   = path.join(REPO_UPLOADS, "posters");
+const REPO_VIDEOS    = path.join(REPO_UPLOADS, "videos");
 
 function safeMkdir(dir) {
     try {
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     } catch (e) {
         console.warn("⚠️ تعذّر إنشاء المجلد:", dir, e.message);
     }
 }
+
+/* ننشئ مجلدات الكتابة (مؤقتة على Vercel) */
+[WRITE_DIR, WRITE_POSTERS, WRITE_VIDEOS].forEach(safeMkdir);
 
 /* ===== Middleware ===== */
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-/* ===== المجلدات ===== */
-const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
-const POSTERS_DIR = path.join(UPLOADS_DIR, "posters");
-const VIDEOS_DIR  = path.join(UPLOADS_DIR, "videos");
-
-[UPLOADS_DIR, POSTERS_DIR, VIDEOS_DIR].forEach(safeMkdir);
-
 /* =====================================================
-   Basic Auth (اختياري - يشتغل بس لو ADMIN_USER + ADMIN_PASS متظبطين)
+   Basic Auth (اختياري)
 ===================================================== */
-
 const ADMIN_USER = process.env.ADMIN_USER;
 const ADMIN_PASS = process.env.ADMIN_PASS;
 
 function basicAuth(req, res, next) {
-
-    /* لو مش متظبطين، دخول حر بدون auth */
     if (!ADMIN_USER || !ADMIN_PASS) return next();
 
     const auth = req.headers.authorization;
-
     if (!auth || !auth.startsWith("Basic ")) {
         res.set("WWW-Authenticate", 'Basic realm="WOLFCINEMA Admin"');
         return res.status(401).send("Authentication required");
@@ -97,31 +89,33 @@ function basicAuth(req, res, next) {
     const decoded = Buffer.from(auth.slice(6), "base64").toString();
     const [user, pass] = decoded.split(":");
 
-    if (user === ADMIN_USER && pass === ADMIN_PASS) {
-        return next();
-    }
+    if (user === ADMIN_USER && pass === ADMIN_PASS) return next();
 
     res.set("WWW-Authenticate", 'Basic realm="WOLFCINEMA Admin"');
     return res.status(401).send("Invalid credentials");
 }
 
 /* =====================================================
-   خدمة الملفات الثابتة (Static Files)
+   خدمة الملفات الثابتة
 ===================================================== */
 
-/* لوحة التحكم — بدون auth افتراضيًا */
+/* لوحة التحكم */
 app.use("/admin", basicAuth, express.static(path.join(__dirname, "admin")));
 
-/* خدمة الصور والفيديوهات */
-app.use("/uploads", express.static(UPLOADS_DIR));
+/* 
+   الصور والفيديوهات:
+   1. نحاول من مجلد الريبو أولاً (الصور المرفوعة على GitHub)
+   2. لو مش موجودة، نجرب من مجلد الكتابة (اللي رفعناه حالاً)
+*/
+app.use("/uploads", express.static(REPO_UPLOADS));
+app.use("/uploads", express.static(WRITE_DIR));
 
-/* خدمة ملفات الواجهة الأمامية */
+/* ملفات الواجهة الأمامية (HTML, CSS, JS) */
 app.use(express.static(path.join(__dirname, "..")));
 
 /* =====================================================
    إنشاء الجداول
 ===================================================== */
-
 async function initDatabase() {
     try {
         await db.execute(`
@@ -189,15 +183,14 @@ async function initDatabase() {
 initDatabase();
 
 /* =====================================================
-   MULTER
+   MULTER — للكتابة في المجلد القابل للكتابة
 ===================================================== */
-
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         if (file.fieldname === "poster" || file.fieldname === "episode_poster") {
-            cb(null, POSTERS_DIR);
+            cb(null, WRITE_POSTERS);
         } else {
-            cb(null, VIDEOS_DIR);
+            cb(null, WRITE_VIDEOS);
         }
     },
     filename: (req, file, cb) => {
@@ -363,21 +356,13 @@ app.post(
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `,
                 args: [
-                    title,
-                    type,
-                    year || null,
-                    genre || null,
-                    description || null,
-                    posterPath,
-                    videoPath,
+                    title, type,
+                    year || null, genre || null, description || null,
+                    posterPath, videoPath,
                     has_episodes === "true" ? 1 : 0,
-                    rating || null,
-                    country || null,
-                    language || null,
-                    status || null,
+                    rating || null, country || null, language || null, status || null,
                     featured === "true" ? 1 : 0,
-                    parent_id || null,
-                    season_number || null
+                    parent_id || null, season_number || null
                 ]
             });
 
@@ -426,12 +411,12 @@ app.put(
                 : null;
 
             if (newPoster && oldWork.poster) {
-                const full = path.join(DATA_DIR, oldWork.poster);
+                const full = path.join(WRITE_DIR, oldWork.poster.replace("uploads/", ""));
                 if (fs.existsSync(full)) fs.unlinkSync(full);
             }
 
             if (newVideo && oldWork.video) {
-                const full = path.join(DATA_DIR, oldWork.video);
+                const full = path.join(WRITE_DIR, oldWork.video.replace("uploads/", ""));
                 if (fs.existsSync(full)) fs.unlinkSync(full);
             }
 
@@ -448,20 +433,12 @@ app.put(
                     WHERE id = ?
                 `,
                 args: [
-                    title || "",
-                    type || "",
-                    year || null,
-                    genre || null,
-                    description || null,
-                    rating || null,
-                    country || null,
-                    language || null,
-                    status || null,
+                    title || "", type || "",
+                    year || null, genre || null, description || null,
+                    rating || null, country || null, language || null, status || null,
                     featured === "true" || featured === 1 ? 1 : 0,
-                    finalPoster,
-                    finalVideo,
-                    parent_id || null,
-                    season_number || null,
+                    finalPoster, finalVideo,
+                    parent_id || null, season_number || null,
                     req.params.id
                 ]
             });
@@ -484,7 +461,7 @@ app.delete("/api/works/:id", async (req, res) => {
             const row = rowR.rows[0];
             [row.poster, row.video].forEach(p => {
                 if (p) {
-                    const full = path.join(DATA_DIR, p);
+                    const full = path.join(WRITE_DIR, p.replace("uploads/", ""));
                     if (fs.existsSync(full)) fs.unlinkSync(full);
                 }
             });
@@ -554,7 +531,7 @@ app.delete("/api/episodes/:id", async (req, res) => {
             const row = rowR.rows[0];
             [row.video, row.poster].forEach(p => {
                 if (p) {
-                    const full = path.join(DATA_DIR, p);
+                    const full = path.join(WRITE_DIR, p.replace("uploads/", ""));
                     if (fs.existsSync(full)) fs.unlinkSync(full);
                 }
             });
@@ -696,7 +673,8 @@ if (process.env.VERCEL !== "1") {
         console.log("🎬 WOLFCINEMA Backend شغال (Turso)");
         console.log(`🌐 API: http://localhost:${PORT}`);
         console.log(`🔒 الداشبورد: http://localhost:${PORT}/admin`);
-        console.log(`📁 مجلد البيانات: ${DATA_DIR}`);
+        console.log(`📁 مجلد القراءة: ${REPO_UPLOADS}`);
+        console.log(`📁 مجلد الكتابة: ${WRITE_DIR}`);
         console.log("=====================================");
     });
 }
