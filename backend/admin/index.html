@@ -412,5 +412,56 @@
     <div class="toast" id="toast"></div>
 
     <script src="admin.js"></script>
+    <script>
+    // دالة للتحقق من وجود توكن، وإذا لم يوجد، اعرض شاشة تسجيل الدخول
+    function checkAuth() {
+        const token = localStorage.getItem('adminToken');
+        if (!token) {
+            showLoginForm();
+        }
+    }
+
+    function showLoginForm() {
+        document.body.innerHTML = `
+            <div style="display:flex; justify-content:center; align-items:center; height:100vh; background:#111; color:white; font-family:sans-serif;">
+                <div style="background:#1a1a1a; padding:40px; border-radius:10px; width:300px; text-align:center;">
+                    <h2 style="margin-bottom:20px;">تسجيل الدخول</h2>
+                    <input type="text" id="loginUsername" placeholder="اسم المستخدم" style="width:90%; padding:10px; margin-bottom:10px; border-radius:5px; border:1px solid #333; background:#222; color:white;">
+                    <input type="password" id="loginPassword" placeholder="كلمة المرور" style="width:90%; padding:10px; margin-bottom:20px; border-radius:5px; border:1px solid #333; background:#222; color:white;">
+                    <button onclick="performLogin()" style="width:100%; padding:10px; border:none; border-radius:5px; background:#3b82f6; color:white; cursor:pointer; font-weight:bold;">دخول</button>
+                    <p id="loginError" style="color:#ef4444; margin-top:10px; font-size:14px;"></p>
+                </div>
+            </div>
+        `;
+    }
+
+    async function performLogin() {
+        const username = document.getElementById('loginUsername').value;
+        const password = document.getElementById('loginPassword').value;
+        const errorEl = document.getElementById('loginError');
+
+        try {
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await response.json();
+
+            if (data.success && data.token) {
+                localStorage.setItem('adminToken', data.token);
+                window.location.reload(); // إعادة تحميل الصفحة لبدء التطبيق
+            } else {
+                errorEl.textContent = data.message || 'فشل تسجيل الدخول';
+            }
+        } catch (err) {
+            errorEl.textContent = 'حدث خطأ في الاتصال بالخادم';
+        }
+    }
+
+    // ابدأ التحقق عند تحميل الصفحة
+    checkAuth();
+</script>
 </body>
 </html>

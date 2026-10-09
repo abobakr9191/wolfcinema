@@ -11,7 +11,15 @@
 const API_BASE   = window.location.origin;
 const API        = API_BASE + "/api";
 const SERVER_URL = API_BASE;
-
+// دالة مساعدة لإضافة التوكن إلى هيدرز الطلبات
+function authFetch(url, options = {}) {
+    const token = localStorage.getItem('adminToken');
+    options.headers = {
+        ...options.headers,
+        'Authorization': `Bearer ${token}`
+    };
+    return fetch(url, options);
+}
 let currentWorkId = null;
 let selectedGenres = [];
 let editingWorkId = null;
