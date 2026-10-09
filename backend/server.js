@@ -12,11 +12,24 @@ const { createClient } = require("@libsql/client");
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-/* ===== مجلد البيانات (للصور والفيديوهات فقط) ===== */
-const DATA_DIR = process.env.DATA_DIR || __dirname;
+/* ===== مجلد البيانات ===== */
+/* Vercel: نستخدم /tmp (المسموح بالكتابة فقط) */
+/* محليًا: نستخدم مجلد المشروع */
 
-if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+const isVercel = process.env.VERCEL === "1";
+const DATA_DIR = isVercel
+    ? "/tmp"
+    : (process.env.DATA_DIR || __dirname);
+
+/* محاولة إنشاء المجلدات (بس مش إجباري) */
+function safeMkdir(dir) {
+    try {
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+    } catch (e) {
+        console.warn("⚠️ تعذّر إنشاء المجلد:", dir, e.message);
+    }
 }
 
 /* ===== Middleware ===== */
@@ -25,67 +38,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 /* ===== المجلدات ===== */
-const UPLOADS_DIR   = path.join(DATA_DIR, "uploads");
-const POSTERS_DIR   = path.join(UPLOADS_DIR, "posters");
-const VIDEOS_DIR    = path.join(UPLOADS_DIR, "videos");
+const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
+const POSTERS_DIR = path.join(UPLOADS_DIR, "posters");
+const VIDEOS_DIR  = path.join(UPLOADS_DIR, "videos");
 
-[UPLOADS_DIR, POSTERS_DIR, VIDEOS_DIR].forEach(dir => {
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-});
-
-/* =====================================================
-   حماية لوحة التحكم بكلمة سر (Basic Auth)
-===================================================== */
-
-const ADMIN_USER = process.env.ADMIN_USER || "wolfadmin";
-const ADMIN_PASS = process.env.ADMIN_PASS || "W0lfCin3ma!2026";
-
-function adminAuth(req, res, next) {
-
-    const auth = req.headers.authorization;
-
-    if (!auth || !auth.startsWith("Basic ")) {
-        res.set("WWW-Authenticate", 'Basic realm="WOLFCINEMA Admin"');
-        return res.status(401).send("🔒 يتطلب تسجيل دخول");
-    }
-
-    try {
-        const decoded = Buffer.from(auth.split(" ")[1], "base64").toString("utf8");
-        const [user, pass] = decoded.split(":");
-
-        if (user === ADMIN_USER && pass === ADMIN_PASS) {
-            return next();
-        }
-    } catch (e) {}
-
-    res.set("WWW-Authenticate", 'Basic realm="WOLFCINEMA Admin"');
-    res.status(401).send("🔒 بيانات غير صحيحة");
-}
-
-/* ===== الملفات الثابتة ===== */
-app.use("/uploads", express.static(UPLOADS_DIR));
-app.use("/admin",   adminAuth, express.static(path.join(__dirname, "admin")));
-app.use("/assets",  express.static(path.join(__dirname, "..", "assets")));
-
-/* =====================================================
-   DATABASE (Turso Cloud)
-===================================================== */
-
-const TURSO_URL   = process.env.TURSO_DATABASE_URL || "libsql://wolfcinema-db-abobakr9191.aws-eu-west-1.turso.io";
-const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
-
-if (!TURSO_TOKEN) {
-    console.error("❌ خطأ: TURSO_AUTH_TOKEN مش موجود في المتغيرات");
-    process.exit(1);
-}
-
-const db = createClient({
-    url: TURSO_URL,
-    authToken: TURSO_TOKEN
-});
-
-console.log("✅ قاعدة البيانات (Turso) متصلة");
-
+[UPLOADS_DIR, POSTERS_DIR, VIDEOS_DIR].forEach(safeMkdir);
 /* =====================================================
    إنشاء الجداول
 ===================================================== */
