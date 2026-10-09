@@ -1,5 +1,5 @@
 /* =====================================================
-   WOLFCINEMA — BACKEND SERVER (Turso Edition) - FIXED
+   WOLFCINEMA — BACKEND SERVER (Turso Edition) - FINAL
 ===================================================== */
 
 const express = require("express");
@@ -13,8 +13,6 @@ const app  = express();
 const PORT = process.env.PORT || 3000;
 
 /* ===== إعداد قاعدة البيانات ===== */
-/* الإنتاج (Vercel / Fly.io): Turso Cloud */
-/* التطوير المحلي: SQLite ملف محلي */
 
 const TURSO_URL   = process.env.TURSO_DATABASE_URL;
 const TURSO_AUTH_TOKEN = process.env.TURSO_AUTH_TOKEN;
@@ -64,16 +62,46 @@ const VIDEOS_DIR  = path.join(UPLOADS_DIR, "videos");
 [UPLOADS_DIR, POSTERS_DIR, VIDEOS_DIR].forEach(safeMkdir);
 
 /* =====================================================
+   Basic Auth (اختياري - يشتغل بس لو ADMIN_USER + ADMIN_PASS متظبطين)
+===================================================== */
+
+const ADMIN_USER = process.env.ADMIN_USER;
+const ADMIN_PASS = process.env.ADMIN_PASS;
+
+function basicAuth(req, res, next) {
+
+    /* لو مش متظبطين، دخول حر بدون auth */
+    if (!ADMIN_USER || !ADMIN_PASS) return next();
+
+    const auth = req.headers.authorization;
+
+    if (!auth || !auth.startsWith("Basic ")) {
+        res.set("WWW-Authenticate", 'Basic realm="WOLFCINEMA Admin"');
+        return res.status(401).send("Authentication required");
+    }
+
+    const decoded = Buffer.from(auth.slice(6), "base64").toString();
+    const [user, pass] = decoded.split(":");
+
+    if (user === ADMIN_USER && pass === ADMIN_PASS) {
+        return next();
+    }
+
+    res.set("WWW-Authenticate", 'Basic realm="WOLFCINEMA Admin"');
+    return res.status(401).send("Invalid credentials");
+}
+
+/* =====================================================
    خدمة الملفات الثابتة (Static Files)
 ===================================================== */
 
-/* ←←← ده أهم سطر ناقص: بيقدم لوحة التحكم */
-app.use("/admin", express.static(path.join(__dirname, "admin")));
+/* لوحة التحكم — بدون auth افتراضيًا */
+app.use("/admin", basicAuth, express.static(path.join(__dirname, "admin")));
 
 /* خدمة الصور والفيديوهات */
 app.use("/uploads", express.static(UPLOADS_DIR));
 
-/* خدمة ملفات الواجهة الأمامية لو موجودة */
+/* خدمة ملفات الواجهة الأمامية */
 app.use(express.static(path.join(__dirname, "..")));
 
 /* =====================================================
