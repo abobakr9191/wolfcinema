@@ -1,0 +1,1 @@
+Get-ChildItem pages\*.html | ForEach-Object { $t = [IO.File]::ReadAllText($_.FullName); $n = $t.Replace("assets/Logo/","assets/Logo/"); if ($t -ne $n) { [IO.File]::WriteAllText($_.FullName, $n); Write-Host "OK: $($_.Name)" } }
