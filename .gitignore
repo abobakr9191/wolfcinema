@@ -1,8 +1,9 @@
 node_modules/
 backend/database.db
+backend/uploads/videos/
+assets/videos/
 
 .DS_Store
 Thumbs.db
 
 .vscode/
-backend/uploads/videos/

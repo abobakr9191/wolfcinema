@@ -7390,3 +7390,8 @@ body.theater-active { overflow: hidden; }
     transform: translateY(10px);
     pointer-events: none;
 }
+.watch-logo img {
+    height: 50px;
+    width: auto;
+    display: block;
+}
