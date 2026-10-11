@@ -19,6 +19,10 @@ const allContent = [
 ];
 
 
+function normalizeWorkTitle(title) {
+    return String(title || "").replace(/القاضيه(?=\))/g, "القاضية");
+}
+
 /* =====================================================
    CREATE POSTER
 ===================================================== */
@@ -58,7 +62,7 @@ function createPoster(item) {
     image.onerror = function () {
 
         this.onerror = null;
-        this.src = "assets/images/placeholder.jpg";
+        this.src = "assets/logo/wolfcinema.png";
     };
 
 
@@ -187,7 +191,7 @@ async function loadFromBackend() {
 
             const item = {
                 id: w.id,
-                title: w.title,
+                title: normalizeWorkTitle(w.title),
                 type: w.type,
                 year: w.year || "",
                 genre: w.genre || "",
@@ -940,4 +944,86 @@ document.addEventListener(
     window.addEventListener("focus", updateFavCount);
     window.addEventListener("storage", updateFavCount);
 
+})();
+/* =====================================================
+   SECTION CATALOG
+===================================================== */
+(function () {
+    "use strict";
+
+    const overlay = document.getElementById("catalogOverlay");
+    const closeButton = document.getElementById("catalogClose");
+    const title = document.getElementById("catalogTitle");
+    const summary = document.getElementById("catalogSummary");
+    const grid = document.getElementById("catalogGrid");
+    const labels = { "فيلم": "أحدث الأفلام", "مسلسل": "أحدث المسلسلات", "أنمي": "أحدث الأنمي" };
+    const sourceByType = { "فيلم": movies, "مسلسل": series, "أنمي": anime };
+    let lastTrigger = null;
+
+    if (!overlay || !closeButton || !title || !summary || !grid) return;
+
+    function closeCatalog() {
+        overlay.classList.remove("active");
+        overlay.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("catalog-open");
+        if (lastTrigger) lastTrigger.focus();
+    }
+
+    function openCatalog(type, trigger) {
+        const items = sourceByType[type] || [];
+        lastTrigger = trigger;
+        title.textContent = labels[type] || "كل الأعمال";
+        summary.textContent = `يضم هذا القسم ${items.length} من الأعمال المتاحة.`;
+        grid.replaceChildren();
+
+        if (!items.length) {
+            const empty = document.createElement("p");
+            empty.className = "catalog-empty";
+            empty.textContent = "لا توجد أعمال متاحة في هذا القسم حاليًا.";
+            grid.appendChild(empty);
+        } else {
+            items.forEach(item => {
+                const card = document.createElement("a");
+                card.className = "catalog-card";
+                card.href = `pages/details.html?id=${encodeURIComponent(item.id || "")}`;
+
+                const image = document.createElement("img");
+                image.src = item.image || "assets/logo/wolfcinema.png";
+                image.alt = item.title || "بوستر العمل";
+                image.loading = "lazy";
+                image.onerror = function () {
+                    this.onerror = null;
+                    this.src = "assets/logo/wolfcinema.png";
+                };
+
+                const info = document.createElement("div");
+                info.className = "catalog-card-info";
+                const name = document.createElement("h3");
+                name.className = "catalog-card-title";
+                name.textContent = normalizeWorkTitle(item.title);
+                const meta = document.createElement("div");
+                meta.className = "catalog-card-meta";
+                meta.textContent = [item.year, item.genre].filter(Boolean).join(" · ");
+                info.append(name, meta);
+                card.append(image, info);
+                grid.appendChild(card);
+            });
+        }
+
+        overlay.classList.add("active");
+        overlay.setAttribute("aria-hidden", "false");
+        document.body.classList.add("catalog-open");
+        closeButton.focus();
+    }
+
+    document.querySelectorAll(".more-link[data-content-type]").forEach(button => {
+        button.addEventListener("click", () => openCatalog(button.dataset.contentType, button));
+    });
+    closeButton.addEventListener("click", closeCatalog);
+    overlay.addEventListener("click", event => {
+        if (event.target === overlay) closeCatalog();
+    });
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && overlay.classList.contains("active")) closeCatalog();
+    });
 })();

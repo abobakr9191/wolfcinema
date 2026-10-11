@@ -112,7 +112,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             work = {
                 id: apiWork.id,
-                title: apiWork.title,
+                title: String(apiWork.title || "").replace(/القاضيه(?=\))/g, "القاضية"),
                 type: apiWork.type,
                 year: apiWork.year || "-",
                 genre: apiWork.genre || "-",

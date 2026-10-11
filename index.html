@@ -7,10 +7,10 @@
 
     <title>WOLFCINEMA</title>
 
-    <!-- تم تعديل المسار هنا لـ logo بحرف كبير -->
-<link rel="icon" type="image/png" sizes="32x32" href="assets/Logo/wolfcinema.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="assets/Logo/wolfcinema.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="assets/Logo/wolfcinema.png">
+    <!-- الشعار يستخدم اسم المجلد بنفس حالة الأحرف الموجودة في المستودع -->
+<link rel="icon" type="image/png" sizes="32x32" href="assets/logo/wolfcinema.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/logo/wolfcinema.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/logo/wolfcinema.png">
 <meta name="google-site-verification" content="W6zmux6QggInnS82Rb68zjr8qpkqvntWldrGNCAGapE" />
 
     <link rel="stylesheet" href="style.css">
@@ -23,8 +23,8 @@
     <header class="navbar">
 
         <a href="index.html" class="logo">
-            <!-- تم تعديل المسار هنا لـ logo بحرف كبير -->
-            <img src="assets/Logo/wolfcinema.png" alt="WOLFCINEMA">
+            <!-- الشعار يستخدم اسم المجلد بنفس حالة الأحرف الموجودة في المستودع -->
+            <img src="assets/logo/wolfcinema.png" alt="WOLFCINEMA">
         </a>
 
         <nav class="nav-links">
@@ -65,7 +65,7 @@
         <section class="content-section" id="movies">
             <div class="section-header">
                 <h2>أحدث الأفلام</h2>
-                <a href="#" class="more-link">مشاهدة المزيد ←</a>
+                <button type="button" class="more-link" data-content-type="فيلم">عرض الكل ←</button>
             </div>
             <div class="poster-grid" id="movies-container"></div>
         </section>
@@ -74,7 +74,7 @@
         <section class="content-section" id="series">
             <div class="section-header">
                 <h2>أحدث المسلسلات</h2>
-                <a href="#" class="more-link">مشاهدة المزيد ←</a>
+                <button type="button" class="more-link" data-content-type="مسلسل">عرض الكل ←</button>
             </div>
             <div class="poster-grid" id="series-container"></div>
         </section>
@@ -83,7 +83,7 @@
         <section class="content-section" id="anime">
             <div class="section-header">
                 <h2>أحدث الأنمي</h2>
-                <a href="#" class="more-link">مشاهدة المزيد ←</a>
+                <button type="button" class="more-link" data-content-type="أنمي">عرض الكل ←</button>
             </div>
             <div class="poster-grid" id="anime-container"></div>
         </section>
@@ -106,6 +106,16 @@
     </footer>
 
 
+    <div class="catalog-overlay" id="catalogOverlay" aria-hidden="true">
+        <section class="catalog-dialog" role="dialog" aria-modal="true" aria-labelledby="catalogTitle" tabindex="-1">
+            <button class="catalog-close" id="catalogClose" type="button" aria-label="إغلاق">✕</button>
+            <div class="catalog-heading">
+                <h2 id="catalogTitle"></h2>
+                <p id="catalogSummary"></p>
+            </div>
+            <div class="catalog-grid" id="catalogGrid"></div>
+        </section>
+    </div>
     <!-- =====================================================
          SEARCH OVERLAY
     ===================================================== -->
