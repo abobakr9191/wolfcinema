@@ -85,10 +85,10 @@ body {
 
 
 /* =====================================================
-   logo
+   Logo
 ===================================================== */
 
-.logo {
+.Logo {
     width: 160px;
     height: 50px;
 
@@ -104,7 +104,7 @@ body {
 }
 
 
-.logo img {
+.Logo img {
     width: 145px;
     height: 42px;
 
@@ -1191,12 +1191,12 @@ body {
     }
 
 
-    .logo {
+    .Logo {
         width: 135px;
     }
 
 
-    .logo img {
+    .Logo img {
         width: 125px;
         height: 38px;
     }
@@ -1275,13 +1275,13 @@ body {
     }
 
 
-    .logo {
+    .Logo {
         width: 125px;
         height: 42px;
     }
 
 
-    .logo img {
+    .Logo img {
         width: 115px;
         height: 35px;
     }
@@ -2345,7 +2345,7 @@ detailsWrapper {
     z-index: 100;
 }
 
-.watch-logo {
+.watch-Logo {
     text-decoration: none;
     font-size: 22px;
     font-weight: 900;
@@ -2353,7 +2353,7 @@ detailsWrapper {
     letter-spacing: 1px;
 }
 
-.watch-logo .red {
+.watch-Logo .red {
     color: #e50914;
 }
 
@@ -7390,7 +7390,7 @@ body.theater-active { overflow: hidden; }
     transform: translateY(10px);
     pointer-events: none;
 }
-.watch-logo img {
+.watch-Logo img {
     height: 50px;
     width: auto;
     display: block;

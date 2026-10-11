@@ -62,7 +62,7 @@ function createPoster(item) {
     image.onerror = function () {
 
         this.onerror = null;
-        this.src = "assets/logo/wolfcinema.png";
+        this.src = "assets/Logo/wolfcinema.png";
     };
 
 
@@ -951,7 +951,7 @@ document.addEventListener(
 (function () {
     "use strict";
 
-    const overlay = document.getElementById("catalogOverlay");
+    const overlay = document.getElementById("cataLogoverlay");
     const closeButton = document.getElementById("catalogClose");
     const title = document.getElementById("catalogTitle");
     const summary = document.getElementById("catalogSummary");
@@ -988,12 +988,12 @@ document.addEventListener(
                 card.href = `pages/details.html?id=${encodeURIComponent(item.id || "")}`;
 
                 const image = document.createElement("img");
-                image.src = item.image || "assets/logo/wolfcinema.png";
+                image.src = item.image || "assets/Logo/wolfcinema.png";
                 image.alt = item.title || "بوستر العمل";
                 image.loading = "lazy";
                 image.onerror = function () {
                     this.onerror = null;
-                    this.src = "assets/logo/wolfcinema.png";
+                    this.src = "assets/Logo/wolfcinema.png";
                 };
 
                 const info = document.createElement("div");
