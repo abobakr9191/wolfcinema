@@ -6,6 +6,8 @@ const express = require("express");
 const cors    = require("cors");
 const path    = require("path");
 const fs      = require("fs");
+const crypto  = require("crypto");
+const jwt     = require("jsonwebtoken");
 const multer  = require("multer");
 const { createClient } = require("@libsql/client");
 
@@ -76,6 +78,59 @@ app.use(express.urlencoded({ extended: true }));
 ===================================================== */
 const ADMIN_USER = process.env.ADMIN_USER;
 const ADMIN_PASS = process.env.ADMIN_PASS;
+const JWT_SECRET = process.env.JWT_SECRET || ADMIN_PASS || "";
+
+function adminConfigured() {
+    return Boolean(ADMIN_USER && ADMIN_PASS && JWT_SECRET);
+}
+
+function safeEqual(a, b) {
+    const left  = Buffer.from(String(a || ""));
+    const right = Buffer.from(String(b || ""));
+    if (left.length !== right.length) return false;
+    return crypto.timingSafeEqual(left, right);
+}
+
+function signAdminToken() {
+    return jwt.sign({ role: "admin", user: ADMIN_USER }, JWT_SECRET, { expiresIn: "7d" });
+}
+
+function adminAuth(req, res, next) {
+    if (!adminConfigured()) {
+        return res.status(503).json({
+            error: "لوحة التحكم غير مفعّلة. عيّن ADMIN_USER و ADMIN_PASS و JWT_SECRET"
+        });
+    }
+
+    const auth = req.headers.authorization || "";
+    if (!auth.startsWith("Bearer ")) {
+        return res.status(401).json({ error: "تسجيل الدخول مطلوب" });
+    }
+
+    try {
+        const payload = jwt.verify(auth.slice(7), JWT_SECRET);
+        if (payload.role !== "admin") throw new Error("invalid");
+        req.admin = payload;
+        return next();
+    } catch (err) {
+        return res.status(401).json({ error: "جلسة منتهية، سجّل الدخول مرة أخرى" });
+    }
+}
+
+function isHttpUrl(value) {
+    try {
+        const url = new URL(String(value || "").trim());
+        return url.protocol === "http:" || url.protocol === "https:";
+    } catch (err) {
+        return false;
+    }
+}
+
+function mediaPath(file, urlField, folder) {
+    if (file && file.filename) return `uploads/${folder}/` + file.filename;
+    if (isHttpUrl(urlField)) return String(urlField).trim();
+    return null;
+}
 
 function basicAuth(req, res, next) {
     if (!ADMIN_USER || !ADMIN_PASS) return next();
@@ -212,7 +267,26 @@ app.get("/api", (req, res) => {
     res.json({ message: "WOLFCINEMA API شغال ✅ (Turso)" });
 });
 
-app.get("/api/stats", async (req, res) => {
+app.post("/api/admin/login", (req, res) => {
+    if (!adminConfigured()) {
+        return res.status(503).json({
+            error: "عيّن ADMIN_USER و ADMIN_PASS و JWT_SECRET في إعدادات Vercel"
+        });
+    }
+
+    const { username, password } = req.body || {};
+    if (!safeEqual(username, ADMIN_USER) || !safeEqual(password, ADMIN_PASS)) {
+        return res.status(401).json({ error: "بيانات الدخول غير صحيحة" });
+    }
+
+    res.json({ success: true, token: signAdminToken() });
+});
+
+app.get("/api/admin/me", adminAuth, (req, res) => {
+    res.json({ success: true, user: req.admin.user });
+});
+
+app.get("/api/stats", adminAuth, async (req, res) => {
     try {
         const totalR    = await db.execute("SELECT COUNT(*) AS total FROM works");
         const moviesR   = await db.execute("SELECT COUNT(*) AS c FROM works WHERE type='فيلم'");
@@ -321,6 +395,7 @@ app.get("/api/works/:id", async (req, res) => {
 
 app.post(
     "/api/works",
+    adminAuth,
     upload.fields([
         { name: "poster", maxCount: 1 },
         { name: "video",  maxCount: 1 }
@@ -337,13 +412,8 @@ app.post(
                 return res.status(400).json({ error: "العنوان والنوع مطلوبان" });
             }
 
-            const posterPath = req.files?.poster
-                ? "uploads/posters/" + req.files.poster[0].filename
-                : null;
-
-            const videoPath = req.files?.video
-                ? "uploads/videos/" + req.files.video[0].filename
-                : null;
+            const posterPath = mediaPath(req.files?.poster?.[0], req.body.poster_url, "posters");
+            const videoPath  = mediaPath(req.files?.video?.[0], req.body.video_url, "videos");
 
             const result = await db.execute({
                 sql: `
@@ -379,6 +449,7 @@ app.post(
 
 app.put(
     "/api/works/:id",
+    adminAuth,
     upload.fields([
         { name: "poster", maxCount: 1 },
         { name: "video",  maxCount: 1 }
@@ -402,13 +473,8 @@ app.put(
 
             const oldWork = oldR.rows[0];
 
-            const newPoster = req.files?.poster
-                ? "uploads/posters/" + req.files.poster[0].filename
-                : null;
-
-            const newVideo = req.files?.video
-                ? "uploads/videos/" + req.files.video[0].filename
-                : null;
+            const newPoster = mediaPath(req.files?.poster?.[0], req.body.poster_url, "posters");
+            const newVideo  = mediaPath(req.files?.video?.[0], req.body.video_url, "videos");
 
             if (newPoster && oldWork.poster) {
                 const full = path.join(WRITE_DIR, oldWork.poster.replace("uploads/", ""));
@@ -450,7 +516,7 @@ app.put(
     }
 );
 
-app.delete("/api/works/:id", async (req, res) => {
+app.delete("/api/works/:id", adminAuth, async (req, res) => {
     try {
         const rowR = await db.execute({
             sql: "SELECT poster, video FROM works WHERE id = ?",
@@ -480,6 +546,7 @@ app.delete("/api/works/:id", async (req, res) => {
 
 app.post(
     "/api/works/:id/episodes",
+    adminAuth,
     upload.fields([
         { name: "episode_poster", maxCount: 1 },
         { name: "episode_video",  maxCount: 1 }
@@ -492,13 +559,8 @@ app.post(
                 return res.status(400).json({ error: "رقم الحلقة مطلوب" });
             }
 
-            const posterPath = req.files?.episode_poster
-                ? "uploads/posters/" + req.files.episode_poster[0].filename
-                : null;
-
-            const videoPath = req.files?.episode_video
-                ? "uploads/videos/" + req.files.episode_video[0].filename
-                : null;
+            const posterPath = mediaPath(req.files?.episode_poster?.[0], req.body.episode_poster_url, "posters");
+            const videoPath  = mediaPath(req.files?.episode_video?.[0], req.body.episode_video_url, "videos");
 
             const result = await db.execute({
                 sql: `INSERT INTO episodes (work_id, season, number, title, video, poster)
@@ -520,7 +582,7 @@ app.post(
     }
 );
 
-app.delete("/api/episodes/:id", async (req, res) => {
+app.delete("/api/episodes/:id", adminAuth, async (req, res) => {
     try {
         const rowR = await db.execute({
             sql: "SELECT video, poster FROM episodes WHERE id = ?",
@@ -584,7 +646,7 @@ app.post("/api/works/:id/rate", async (req, res) => {
     }
 });
 
-app.delete("/api/works/:id/rate", async (req, res) => {
+app.delete("/api/works/:id/rate", adminAuth, async (req, res) => {
     try {
         const result = await db.execute({
             sql: "DELETE FROM ratings WHERE work_id = ?",
@@ -619,7 +681,7 @@ app.post("/api/messages", async (req, res) => {
     }
 });
 
-app.get("/api/messages", async (req, res) => {
+app.get("/api/messages", adminAuth, async (req, res) => {
     try {
         const result = await db.execute("SELECT * FROM messages ORDER BY created_at DESC");
         res.json(result.rows || []);
@@ -628,7 +690,7 @@ app.get("/api/messages", async (req, res) => {
     }
 });
 
-app.get("/api/messages/unread/count", async (req, res) => {
+app.get("/api/messages/unread/count", adminAuth, async (req, res) => {
     try {
         const result = await db.execute("SELECT COUNT(*) AS count FROM messages WHERE is_read = 0");
         res.json({ count: Number(result.rows[0].count) });
@@ -637,7 +699,7 @@ app.get("/api/messages/unread/count", async (req, res) => {
     }
 });
 
-app.put("/api/messages/:id/read", async (req, res) => {
+app.put("/api/messages/:id/read", adminAuth, async (req, res) => {
     try {
         await db.execute({
             sql: "UPDATE messages SET is_read = 1 WHERE id = ?",
@@ -649,7 +711,7 @@ app.put("/api/messages/:id/read", async (req, res) => {
     }
 });
 
-app.delete("/api/messages/:id", async (req, res) => {
+app.delete("/api/messages/:id", adminAuth, async (req, res) => {
     try {
         await db.execute({
             sql: "DELETE FROM messages WHERE id = ?",
